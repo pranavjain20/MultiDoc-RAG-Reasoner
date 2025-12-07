@@ -36,8 +36,10 @@ class LLMClient:
         max_retries: int = 3,
     ) -> str:
         """Generate text using HuggingFace API with retry logic."""
-        temperature = temperature or self.default_temperature
-        max_tokens = max_tokens or self.default_max_tokens
+        if temperature is None:
+            temperature = self.default_temperature
+        if max_tokens is None:
+            max_tokens = self.default_max_tokens
 
         if system_prompt:
             full_prompt = f"System: {system_prompt}\n\nQuestion: {prompt}\n\nAnswer:"
