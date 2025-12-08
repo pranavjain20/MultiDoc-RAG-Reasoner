@@ -22,7 +22,7 @@ class LLMClient:
             raise ValueError("HF_TOKEN not found in environment variables. Please set it in your .env file.")
 
         self.model_id = model_id
-        self.api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+        self.api_url = f"https://router.huggingface.co/models/{model_id}"
         self.headers = {"Authorization": f"Bearer {self.token}"}
         self.default_temperature = 0.3
         self.default_max_tokens = 512
