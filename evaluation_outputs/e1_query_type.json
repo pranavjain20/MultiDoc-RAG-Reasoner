@@ -1,0 +1,40 @@
+{
+  "accuracy": 1.0,
+  "records": [
+    {
+      "qid": "q1",
+      "question": "Summarize the main ideas discussed across these documents.",
+      "gold_type": "synthesis",
+      "predicted": "synthesis",
+      "correct": true
+    },
+    {
+      "qid": "q2",
+      "question": "What are the main sources of risk mentioned across the documents?",
+      "gold_type": "synthesis",
+      "predicted": "synthesis",
+      "correct": true
+    },
+    {
+      "qid": "q3",
+      "question": "Compare how different documents describe the same concept or methodology.",
+      "gold_type": "comparison",
+      "predicted": "comparison",
+      "correct": true
+    },
+    {
+      "qid": "q4",
+      "question": "What are the key assumptions and limitations highlighted in these documents?",
+      "gold_type": "extraction",
+      "predicted": "extraction",
+      "correct": true
+    },
+    {
+      "qid": "q5",
+      "question": "How do the documents differ in their conclusions or policy implications?",
+      "gold_type": "comparison",
+      "predicted": "comparison",
+      "correct": true
+    }
+  ]
+}
