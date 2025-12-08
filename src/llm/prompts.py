@@ -19,18 +19,21 @@ Citation rules:
 
 
 def build_synthesis_prompt(question: str, chunks: List[Dict[str, str]]) -> str:
+    """Build prompt for synthesis/summarization questions."""
     if not chunks:
         return f"Question: {question}\n\nNo documents provided for analysis."
 
     doc_chunks: Dict[str, List[str]] = {}
     for chunk in chunks:
         doc_name = chunk.get("doc_name", "Unknown.pdf")
-        doc_chunks.setdefault(doc_name, []).append(chunk.get("text", ""))
+        if doc_name not in doc_chunks:
+            doc_chunks[doc_name] = []
+        doc_chunks[doc_name].append(chunk.get("text", ""))
 
-    doc_sections = []
+    doc_sections: List[str] = []
     for doc_name, texts in doc_chunks.items():
-        joined = "\n\n".join(texts)
-        doc_sections.append(f"--- {doc_name} ---\n" + joined)
+        joined_text = "\n\n".join(texts)
+        doc_sections.append(f"--- {doc_name} ---\n{joined_text}")
 
     documents_text = "\n\n".join(doc_sections)
     is_single = len(doc_chunks) == 1
@@ -74,6 +77,7 @@ Please provide your analysis:"""
 
 
 def build_comparison_prompt(question: str, chunks_by_doc: Dict[str, List[str]]) -> str:
+    """Build prompt for comparison questions."""
     if not chunks_by_doc:
         return f"Question: {question}\n\nNo documents provided for analysis."
 
@@ -93,62 +97,70 @@ what aspects might benefit from comparison with additional documents.
 
 Please provide your analysis with citations as [{doc_name}]:"""
 
-    doc_sections = []
+    doc_sections: List[str] = []
     for doc_name, chunks in chunks_by_doc.items():
-        joined = "\n\n".join(chunks)
-        doc_sections.append(f"=== {doc_name} ===\n" + joined + "\n")
+        joined_text = "\n\n".join(chunks)
+        doc_sections.append(f"=== {doc_name} ===\n{joined_text}\n")
+
+    docs_block = "".join(doc_sections)
 
     return f"""Compare information across the following documents to answer the question:
 
 Question: {question}
 
 Documents:
-{''.join(doc_sections)}
+{docs_block}
 
 Instructions:
 1. Analyze each document's treatment of the concept, methodology, or conclusion in question
-2. Identify COMMON GROUND: shared perspectives, definitions, or approaches (cite sources)
-3. Identify KEY DIFFERENCES: varying approaches, methodologies, perspectives
+2. Identify COMMON GROUND: shared perspectives, definitions, or approaches (cite sources with [DocumentName.pdf])
+3. Identify KEY DIFFERENCES: varying approaches, methodologies, perspectives (cite sources)
 4. Highlight UNIQUE CONTRIBUTIONS: what each document adds that others do not
-5. Address CONTRADICTIONS OR TENSIONS explicitly
+5. Address CONTRADICTIONS OR TENSIONS: if documents directly contradict each other, state this explicitly
 6. Structure your response: overview, common ground, key differences, unique contributions, contradictions
 
 Please provide your comparative analysis:"""
 
 
 def build_extraction_prompt(question: str, chunks: List[Dict[str, str]]) -> str:
+    """Build prompt for targeted extraction questions."""
     if not chunks:
         return f"Question: {question}\n\nNo documents provided for analysis."
 
     doc_chunks: Dict[str, List[str]] = {}
     for chunk in chunks:
         doc_name = chunk.get("doc_name", "Unknown.pdf")
-        doc_chunks.setdefault(doc_name, []).append(chunk.get("text", ""))
+        if doc_name not in doc_chunks:
+            doc_chunks[doc_name] = []
+        doc_chunks[doc_name].append(chunk.get("text", ""))
 
-    doc_sections = []
-    for doc_name, texts in doc_chunks.items:
-        joined = "\n\n".join(texts)
-        doc_sections.append(f"--- {doc_name} ---\n" + joined)
+    doc_sections: List[str] = []
+    for doc_name, texts in doc_chunks.items():
+        joined_text = "\n\n".join(texts)
+        doc_sections.append(f"--- {doc_name} ---\n{joined_text}")
+
+    docs_block = "\n\n".join(doc_sections)
 
     return f"""Extract specific information from the following documents to answer the question:
 
 Question: {question}
 
 Documents:
-{"\n\n".join(doc_sections)}
+{docs_block}
 
 Instructions:
-1. List all relevant elements (assumptions, limitations, etc.)
-2. For each element: quote or paraphrase & cite the source
-3. Indicate whether each element is explicit or implicit
-4. Group by category if applicable
-5. Extract ALL relevant instances across documents
-6. If something is missing, explicitly note what is absent
+1. Identify and list all relevant elements mentioned in the question (assumptions, limitations, etc.)
+2. For each extracted element: quote or paraphrase the relevant text and cite source using [DocumentName.pdf]
+3. Indicate whether each element is explicitly stated or implicitly suggested
+4. Group by category if applicable (e.g., assumptions vs. limitations)
+5. Extract all relevant instances across all documents
+6. If certain types of information are missing, note what is absent
 
 Please provide your extraction:"""
 
 
 def select_prompt_builder(query_type: str) -> Callable:
+    """Select prompt builder function based on query type."""
     mapping: Dict[str, Callable] = {
         "synthesis": build_synthesis_prompt,
         "comparison": build_comparison_prompt,
@@ -160,4 +172,16 @@ def select_prompt_builder(query_type: str) -> Callable:
             f"Unknown query_type '{query_type}'. Must be one of: {', '.join(mapping.keys())}"
         )
     return mapping[query_type_lower]
+
+
+
+
+
+
+
+
+
+
+
+
 
