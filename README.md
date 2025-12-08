@@ -11,7 +11,6 @@ This repo contains the core backend used in our COMS 4995 final project
 ## 1. Repository Structure
 
 ```text
-
 ├── evaluation_files/           # PDFs used for evaluation (doc1.pdf, doc2.pdf, ...)
 ├── evaluation_outputs/         # JSON outputs from evaluation pipeline (E1–E4)
 │   ├── e1_query_type.json
