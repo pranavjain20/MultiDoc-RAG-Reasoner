@@ -37,10 +37,11 @@ from llm.prompts import (
 OUTPUT_DIR = "evaluation_outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-
+# =========================================================
 # Evaluation questions
+# =========================================================
 
-EVAL_QUESTIONS = [
+EVAL_QUESTIONS: List[Tuple[str, str, str]] = [
     ("q1", "Summarize the main ideas discussed across these documents.", "synthesis"),
     ("q2", "What are the main sources of risk mentioned across the documents?", "synthesis"),
     ("q3", "Compare how different documents describe the same concept or methodology.", "comparison"),
@@ -48,28 +49,35 @@ EVAL_QUESTIONS = [
     ("q5", "How do the documents differ in their conclusions or policy implications?", "comparison"),
 ]
 
-
+# =========================================================
 # Load chunks
+# =========================================================
+
 
 def load_chunks_for_question(qid: str) -> List[Dict[str, Any]]:
     """
     Loads the top-k retrieved chunks for a question.
-    The user must create evaluation_chunks.json beforehand using a retriever.
+    evaluation_chunks.json must be created beforehand
+    (e.g., using examples/export_evaluation_chunks.py).
     """
     path = os.path.join(OUTPUT_DIR, "evaluation_chunks.json")
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f"{path} does not exist. Please generate it in AML_Project.ipynb."
+            f"{path} does not exist. Please generate it first "
+            "using the retrieval pipeline (e.g., export_evaluation_chunks.py)."
         )
     with open(path, "r") as f:
         data = json.load(f)
     return data.get(qid, [])
 
 
+# =========================================================
 # E1 — Query type classification
+# =========================================================
+
 
 def run_e1(reasoner: MultiDocReasoner):
-    results = []
+    results: List[Dict[str, Any]] = []
     correct = 0
 
     for qid, question, gold_type in EVAL_QUESTIONS:
@@ -77,13 +85,15 @@ def run_e1(reasoner: MultiDocReasoner):
         is_correct = pred == gold_type
         correct += int(is_correct)
 
-        results.append({
-            "qid": qid,
-            "question": question,
-            "gold_type": gold_type,
-            "predicted": pred,
-            "correct": is_correct
-        })
+        results.append(
+            {
+                "qid": qid,
+                "question": question,
+                "gold_type": gold_type,
+                "predicted": pred,
+                "correct": is_correct,
+            }
+        )
 
     accuracy = correct / len(EVAL_QUESTIONS)
 
@@ -96,12 +106,15 @@ def run_e1(reasoner: MultiDocReasoner):
     return results
 
 
+# =========================================================
 # E2 — Prompt structure sanity checks
+# =========================================================
+
 
 def run_e2():
     chunks = [
         {"doc_name": "doc1.pdf", "text": "Content A"},
-        {"doc_name": "doc2.pdf", "text": "Content B"}
+        {"doc_name": "doc2.pdf", "text": "Content B"},
     ]
 
     synth = build_synthesis_prompt("Test synthesis", chunks)
@@ -127,10 +140,13 @@ def run_e2():
     return results
 
 
+# =========================================================
 # Baseline prompt
+# =========================================================
+
 
 def build_baseline_prompt(question: str, chunks: List[Dict[str, Any]]) -> str:
-    context = "\n\n".join(c["text"] for c in chunks)
+    context = "\n\n".join(c.get("text", "") for c in chunks)
     return (
         "You are an assistant answering questions using the provided context.\n\n"
         f"Context:\n{context}\n\n"
@@ -138,34 +154,56 @@ def build_baseline_prompt(question: str, chunks: List[Dict[str, Any]]) -> str:
     )
 
 
+# =========================================================
 # E3 — Baseline vs Reasoning
+# =========================================================
+
 
 def run_e3(client: LLMClient, reasoner: MultiDocReasoner):
-    results = []
+    """
+    E3 — Baseline vs Reasoning answer quality.
+
+    For each evaluation question:
+    - Build a simple "baseline" prompt using all chunks as flat context
+    - Build a "reasoning" prompt using MultiDocReasoner
+    - Call the LLM for both prompts
+
+    If HF API is unavailable (404/401/429/etc.), we catch the error
+    and record a placeholder string instead of crashing.
+    """
+    results: List[Dict[str, Any]] = []
 
     print("\n=== E3: Baseline vs Reasoning ===")
 
     for qid, question, gold_type in EVAL_QUESTIONS:
         chunks = load_chunks_for_question(qid)
 
-        # Baseline
+        # Baseline prompt
         baseline_prompt = build_baseline_prompt(question, chunks)
-        baseline_answer = client.generate(prompt=baseline_prompt)
+        try:
+            baseline_answer = client.generate(prompt=baseline_prompt)
+        except Exception as e:
+            baseline_answer = f"[API call failed: {e}]"
 
-        # Reasoning
+        # Reasoning prompt
         reasoning_prompt, qtype = reasoner.build_prompt(question, chunks)
-        reasoning_answer = client.generate(prompt=reasoning_prompt)
+        try:
+            reasoning_answer = client.generate(prompt=reasoning_prompt)
+        except Exception as e:
+            reasoning_answer = f"[API call failed: {e}]"
 
-        results.append({
-            "qid": qid,
-            "question": question,
-            "gold_type": gold_type,
-            "query_type_used": qtype,
-            "baseline_prompt": baseline_prompt,
-            "baseline_answer": baseline_answer,
-            "reasoning_prompt": reasoning_prompt,
-            "reasoning_answer": reasoning_answer,
-        })
+        results.append(
+            {
+                "qid": qid,
+                "question": question,
+                "gold_type": gold_type,
+                "query_type_used": qtype,
+                "baseline_prompt": baseline_prompt,
+                "baseline_answer": baseline_answer,
+                "reasoning_prompt": reasoning_prompt,
+                "reasoning_answer": reasoning_answer,
+            }
+        )
 
     out = os.path.join(OUTPUT_DIR, "e3_baseline_vs_reasoning.json")
     with open(out, "w") as f:
@@ -175,11 +213,25 @@ def run_e3(client: LLMClient, reasoner: MultiDocReasoner):
     return results
 
 
+# =========================================================
 # E4 — Lost-in-the-middle ablation
+# =========================================================
+
 
 def run_e4(client: LLMClient, reasoner: MultiDocReasoner):
+    """
+    E4 — Lost-in-the-middle ablation.
+
+    For a subset of questions (e.g., synthesis/comparison-heavy ones):
+    - Build a prompt without any lost-in-the-middle mitigation
+    - Build a prompt with mitigation (e.g., sorting by score, grouping by doc)
+    - Compare how the answers differ
+
+    As in E3, if the HF API is unavailable, we catch errors and record
+    placeholder strings so the JSON file is still written.
+    """
     target_qids = ["q1", "q3", "q5"]
-    results = []
+    results: List[Dict[str, Any]] = []
 
     print("\n=== E4: Lost-in-the-middle Ablation ===")
 
@@ -190,21 +242,37 @@ def run_e4(client: LLMClient, reasoner: MultiDocReasoner):
         chunks = load_chunks_for_question(qid)
 
         # No mitigation
-        p1, t1 = reasoner.build_prompt(question, chunks, apply_lost_in_middle=False)
-        a1 = client.generate(prompt=p1)
+        p1, t1 = reasoner.build_prompt(
+            question,
+            chunks,
+            apply_lost_in_middle=False,
+        )
+        try:
+            a1 = client.generate(prompt=p1)
+        except Exception as e:
+            a1 = f"[API call failed: {e}]"
 
         # With mitigation
-        p2, t2 = reasoner.build_prompt(question, chunks, apply_lost_in_middle=True)
-        a2 = client.generate(prompt=p2)
+        p2, t2 = reasoner.build_prompt(
+            question,
+            chunks,
+            apply_lost_in_middle=True,
+        )
+        try:
+            a2 = client.generate(prompt=p2)
+        except Exception as e:
+            a2 = f"[API call failed: {e}]"
 
-        results.append({
-            "qid": qid,
-            "question": question,
-            "baseline_prompt": p1,
-            "mitigated_prompt": p2,
-            "answer_no_mitigation": a1,
-            "answer_with_mitigation": a2,
-        })
+        results.append(
+            {
+                "qid": qid,
+                "question": question,
+                "baseline_prompt": p1,
+                "mitigated_prompt": p2,
+                "answer_no_mitigation": a1,
+                "answer_with_mitigation": a2,
+            }
+        )
 
     out = os.path.join(OUTPUT_DIR, "e4_lost_in_middle.json")
     with open(out, "w") as f:
@@ -214,11 +282,14 @@ def run_e4(client: LLMClient, reasoner: MultiDocReasoner):
     return results
 
 
+# =========================================================
 # Main
+# =========================================================
+
 
 def main():
     reasoner = MultiDocReasoner()
-    client = LLMClient(model_id="google/flan-t5-large")  # matches your repo exactly
+    client = LLMClient(model_id="google/flan-t5-large")  # matches repo
 
     run_e1(reasoner)
     run_e2()
