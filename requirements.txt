@@ -1,4 +1,24 @@
-huggingface_hub
+# Core libraries
 python-dotenv
 requests
+huggingface_hub
 
+# LangChain components
+langchain
+langchain-community
+langchain-text-splitters
+
+# Embeddings
+sentence-transformers
+
+# PDF loading
+pypdf
+
+# Tokenization
+tiktoken
+
+# Vector database
+faiss-cpu
+
+# Optional but commonly needed
+numpy
