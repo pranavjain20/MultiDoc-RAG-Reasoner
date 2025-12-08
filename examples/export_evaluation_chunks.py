@@ -76,7 +76,7 @@ def main():
     all_chunks = {}
 
     for qid, question in EVAL_QUESTIONS.items():
-        docs = retriever.get_relevant_documents(question)
+        docs = retriever.invoke(question)
 
         # Map LangChain docs -> simple dicts with doc_name + text
         chunks = []
