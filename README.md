@@ -411,7 +411,66 @@ All results will appear in `evaluation_outputs/`.
 
 ---
 
-## 7. Testing
+## 7. Web UI (Gradio Demo)
+
+We provide an interactive web interface for the multi-document RAG system in `examples/demo_app.py`.
+
+### 7.1 Features
+
+- **Setup Tab**: Upload PDFs and build FAISS index
+- **Query Tab**: Ask questions and view AI-generated answers with:
+  - Detected query type (synthesis/comparison/extraction)
+  - Supporting evidence from retrieved chunks
+  - Citation-aware responses
+
+### 7.2 Running the UI
+```bash
+export PYTHONPATH=src
+python examples/demo_app.py
+```
+
+The interface will launch at `http://localhost:7860`.
+
+### 7.3 Usage
+
+1. **Upload Documents** (Setup tab):
+   - Select one or more PDF files
+   - Click "Build Index" to process documents
+   
+2. **Ask Questions** (Query tab):
+   - Enter your question
+   - View the answer with query type classification
+   - Inspect supporting evidence chunks
+
+### 7.4 Architecture
+
+The UI directly uses the existing backend components:
+- `MultiDocReasoner` for query classification and prompt building
+- `LLMClient` for HuggingFace API calls (google/flan-t5-large)
+- FAISS retriever (k=6) from `index_store/`
+- Same chunking config as evaluation pipeline (chunk_size=800, overlap=150)
+
+### 7.5 Requirements
+
+Make sure to install the additional UI dependency:
+```bash
+pip install gradio langchain-huggingface
+```
+
+And set your HuggingFace token in `.env`:
+```
+HF_TOKEN=your_hf_token_here
+```
+
+### 7.6 Design
+
+The UI features a clean, professional design with:
+- Gradient header with project branding
+- Two-tab workflow (Setup → Query)
+- Team credits footer (COMS 4995 Final Project)
+---
+
+## 8. Testing
 
 We include lightweight tests for each major component.
 
@@ -434,7 +493,7 @@ API error without crashing other scripts.
 
 ---
 
-## 8. Notes and Future Work
+## 9. Notes and Future Work
 
 * The repository currently focuses on **multi-document reasoning** and a
   reproducible evaluation framework.
