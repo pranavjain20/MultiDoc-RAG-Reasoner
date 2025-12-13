@@ -3,19 +3,22 @@ Groq LLM API wrapper for the Multi-Document RAG system.
 """
 
 from __future__ import annotations
+
 import os
 from typing import Optional
 
 from groq import Groq
 
 
+# Human-readable names exposed in the UI (if you ever want to add a dropdown)
 AVAILABLE_MODELS = {
     "LLaMA 3.1 8B (fast)": "llama-3.1-8b-instant",
-    "LLaMA 3.1 70B (better)": "llama-3.1-70b-versatile",
+    "LLaMA 3.3 70B (better)": "llama-3.3-70b-versatile",
     "Mixtral 8x7B (long context)": "mixtral-8x7b-32768",
 }
-DEFAULT_MODEL = AVAILABLE_MODELS["LLaMA 3.1 70B (better)"]
 
+# ✅ IMPORTANT: use an active model (3.1 70B was decommissioned)
+DEFAULT_MODEL = AVAILABLE_MODELS["LLaMA 3.3 70B (better)"]
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a careful teaching assistant for a data science / NLP course project.
@@ -29,21 +32,13 @@ You are a careful teaching assistant for a data science / NLP course project.
 
 
 def _build_user_prompt(question: str, context: Optional[str]) -> str:
-    if context:
-        return (
-            "You are given context chunks retrieved from a PDF corpus.\n"
-            "Use ONLY these chunks to answer the question.\n\n"
-            f"Context:\n{context}\n\n"
-            f"Question: {question}\n\n"
-            "Answer:"
-        )
-    else:
-        return (
-            "Answer the user's question.\n"
-            "If you are not confident, say you don't know.\n\n"
-            f"Question: {question}\n\n"
-            "Answer:"
-        )
+    return (
+        "You are given context chunks retrieved from a PDF corpus.\n"
+        "Use ONLY these chunks to answer the question.\n\n"
+        f"Context:\n{context or ''}\n\n"
+        f"Question: {question}\n\n"
+        "Answer:"
+    )
 
 
 def generate_llm_response(
@@ -73,6 +68,6 @@ def generate_llm_response(
         ],
     )
 
-    msg = completion.choices[0].message
-    return (msg.content or "").strip()
+    message = completion.choices[0].message
+    return (message.content or "").strip()
 
