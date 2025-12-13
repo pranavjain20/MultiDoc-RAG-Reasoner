@@ -25,7 +25,7 @@ class LLMClient:
     def __init__(
         self,
         model_id: str = "google/flan-t5-large",
-        local_model_id: str = "google/flan-t5-small",
+        local_model_id: str = "google/flan-t5-base",
     ) -> None:
         load_dotenv()
 
