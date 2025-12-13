@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from llm.prompts import SYSTEM_PROMPT
 from llm.reasoning import MultiDocReasoner
 
-# Smart external model (your own stronger setup)
+# Smart external model (Groq wrapper)
 from llm.llm_api_groq import generate_llm_response
 
 
@@ -53,6 +53,11 @@ class LLMClient:
         self._local_pipeline = None
         self._local_tokenizer = None
 
+        # Context control (prevents "paper paste" + keeps responses on-task)
+        self.max_chunks_per_doc = 3
+        self.max_chars_per_chunk = 1200
+        self.max_total_context_chars = 12000  # guardrail
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -67,8 +72,10 @@ class LLMClient:
         """
         Generate text from a single prompt string.
 
-        Note: In our project, `prompt` is often already a structured prompt
-        produced by `MultiDocReasoner.build_prompt(...)`.
+        IMPORTANT:
+        - Do NOT call Groq here.
+        - This method is used as a fallback path for HF/local when we already
+          have a structured prompt (often from reasoner.build_prompt()).
         """
         if temperature is None:
             temperature = self.default_temperature
@@ -81,23 +88,7 @@ class LLMClient:
         else:
             full_prompt = f"Question: {prompt}\n\nAnswer:"
 
-        # 1) Try Groq (smart backend) if key exists
-        if self.groq_api_key:
-            try:
-                # Groq API is chat-based; we feed the whole prompt as "question"
-                # with empty context (since `prompt` already contains context).
-                return generate_llm_response(
-                    question=full_prompt,
-                    context=None,
-                    model_name=self.groq_model_name,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-            except Exception:
-                # fall through to HF/local
-                pass
-
-        # 2) Try HuggingFace Inference API
+        # 1) Try HuggingFace Inference API
         api_result = self._generate_via_hf_api(
             full_prompt=full_prompt,
             temperature=temperature,
@@ -107,7 +98,7 @@ class LLMClient:
         if api_result is not None:
             return api_result
 
-        # 3) Local fallback (short prompt to avoid instruction echo)
+        # 2) Local fallback (short prompt to avoid instruction echo)
         local_prompt = f"Question: {prompt}\n\nAnswer:"
         return self._generate_via_local_model(local_prompt, max_tokens)
 
@@ -121,28 +112,63 @@ class LLMClient:
         High-level wrapper used by UI and evaluation.
 
         Strategy:
-        - Keep reasoner for query_type (and fallback prompt building).
-        - Preferred: Groq (question + grouped context).
-        - Fallback: existing HF/local using structured prompt.
+        - Always compute query_type via reasoner.
+        - Preferred: Groq (question + grouped context + task header).
+        - Fallback: HF/local using reasoner-built structured prompt.
         """
         prompt, query_type = reasoner.build_prompt(question, chunks)
 
         # Build grouped context for Groq (better for chat models)
         chunks_by_doc = reasoner.organize_chunks_by_doc(chunks)
 
-        context_parts: List[str] = []
+        # ---- Task header: forces "answer" behavior (not copying paper text) ----
+        task_header = f"""
+You are answering a user question using excerpts from multiple PDF documents.
+
+Rules:
+- Answer the QUESTION directly. Do NOT copy/paste long passages.
+- Summarize and compare at a high level. Use short bullets or short paragraphs.
+- If documents disagree, say so explicitly.
+- Cite sources using [DocumentName.pdf] when you use a specific claim.
+- If the context is not sufficient, say: "I don't know based on the documents."
+
+Query type: {query_type}
+""".strip()
+
+        context_parts: List[str] = [task_header, ""]
+
+        # ---- Add chunks with limits ----
+        total_chars = 0
         for doc_name, doc_chunks in chunks_by_doc.items():
             context_parts.append(f"--- {doc_name} ---")
 
+            used = 0
             for c in doc_chunks:
-                # IMPORTANT: doc_chunks might be a list of dicts OR a list of strings
+                if used >= self.max_chunks_per_doc:
+                    break
+
+                # doc_chunks might be list[dict] OR list[str]
                 if isinstance(c, dict):
                     txt = (c.get("text") or "").strip()
                 else:
                     txt = str(c).strip()
 
-                if txt:
-                    context_parts.append(txt)
+                if not txt:
+                    continue
+
+                # per-chunk truncate
+                txt = txt[: self.max_chars_per_chunk]
+
+                # global truncate
+                if total_chars + len(txt) > self.max_total_context_chars:
+                    break
+
+                context_parts.append(txt)
+                total_chars += len(txt)
+                used += 1
+
+            if total_chars >= self.max_total_context_chars:
+                break
 
         context = "\n\n".join(context_parts).strip()
 
@@ -162,7 +188,7 @@ class LLMClient:
                 # fall through to HF/local
                 pass
 
-        # 2) Fallback: existing HF/local path using structured prompt
+        # 2) Fallback: HF/local path using structured prompt
         response_text = self.generate(prompt=prompt, system_prompt=SYSTEM_PROMPT)
         return {"response": response_text, "query_type": query_type}
 
@@ -232,11 +258,10 @@ class LLMClient:
                 model=self.local_model_id,
             )
 
-        # Keep buffer under typical max length (works well for flan-t5-base too)
         inputs = self._local_tokenizer(
             prompt,
             truncation=True,
-            max_length=768,  # base can handle more than small; still keep safe
+            max_length=768,
             return_tensors="pt",
         )
         truncated_prompt = self._local_tokenizer.decode(
