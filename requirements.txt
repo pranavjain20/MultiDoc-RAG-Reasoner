@@ -22,3 +22,7 @@ faiss-cpu
 
 # Optional but commonly needed
 numpy
+
+# UI/Demo Layer
+gradio
+langchain-huggingface
