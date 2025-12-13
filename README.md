@@ -19,8 +19,8 @@ This repo contains the core backend used in our COMS 4995 final project
 │   ├── e4_lost_in_middle.json
 │   └── evaluation_chunks.json
 ├── examples/
-│   ├── build_index.py          # Offline ingestion + FAISS index builder
 │   ├── build_UI.py             # UI
+│   ├── build_index.py          # Offline ingestion + FAISS index builder       
 │   ├── export_evaluation_chunks.py   # Retrieval → export top-k chunks
 │   ├── evaluation.py           # E1–E4 evaluation driver
 │   ├── test_llm_client.py
