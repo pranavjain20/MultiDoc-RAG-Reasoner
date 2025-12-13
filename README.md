@@ -426,7 +426,7 @@ We provide an interactive web interface for the multi-document RAG system in `ex
 
 ### 7.2 Running the UI
 ```bash
-export PYTHONPATH=src
+export PYTHONPATH=src (Window: $env:PYTHONPATH="src")
 python examples/build_UI.py  
 ```
 
