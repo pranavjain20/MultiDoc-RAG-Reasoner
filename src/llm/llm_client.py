@@ -9,7 +9,7 @@ Priority:
 
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 from dotenv import load_dotenv
@@ -114,7 +114,7 @@ class LLMClient:
     def generate_with_reasoning(
         self,
         question: str,
-        chunks: List[Dict[str, str]],
+        chunks: List[Union[Dict[str, str], str]],
         reasoner: MultiDocReasoner,
     ) -> Dict[str, Any]:
         """
@@ -129,13 +129,21 @@ class LLMClient:
 
         # Build grouped context for Groq (better for chat models)
         chunks_by_doc = reasoner.organize_chunks_by_doc(chunks)
+
         context_parts: List[str] = []
         for doc_name, doc_chunks in chunks_by_doc.items():
             context_parts.append(f"--- {doc_name} ---")
+
             for c in doc_chunks:
-                txt = (c.get("text") or "").strip()
+                # IMPORTANT: doc_chunks might be a list of dicts OR a list of strings
+                if isinstance(c, dict):
+                    txt = (c.get("text") or "").strip()
+                else:
+                    txt = str(c).strip()
+
                 if txt:
                     context_parts.append(txt)
+
         context = "\n\n".join(context_parts).strip()
 
         # 1) Primary: Groq if available
