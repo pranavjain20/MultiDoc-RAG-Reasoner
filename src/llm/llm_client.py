@@ -44,6 +44,7 @@ class LLMClient:
 
         # ---- Lazy-loaded local model ----
         self._local_pipeline = None
+        self._local_tokenizer = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -64,6 +65,7 @@ class LLMClient:
         if max_tokens is None:
             max_tokens = self.default_max_tokens
 
+        # Full prompt used for HF API (if it works)
         if system_prompt:
             full_prompt = f"System: {system_prompt}\n\nQuestion: {prompt}\n\nAnswer:"
         else:
@@ -76,8 +78,11 @@ class LLMClient:
         if api_result is not None:
             return api_result
 
-        # 2) Fallback to local transformers
-        return self._generate_via_local_model(full_prompt, max_tokens)
+        # 2) Local fallback:
+        # Avoid huge system prompt (prevents instruction-echo),
+        # keep it short so flan-t5-small answers instead of repeating rules.
+        local_prompt = f"Question: {prompt}\n\nAnswer:"
+        return self._generate_via_local_model(local_prompt, max_tokens)
 
     def generate_with_reasoning(
         self,
@@ -89,9 +94,7 @@ class LLMClient:
         High-level wrapper used by UI and evaluation.
         """
         prompt, query_type = reasoner.build_prompt(question, chunks)
-        response_text = self.generate(
-            prompt=prompt, system_prompt=SYSTEM_PROMPT
-        )
+        response_text = self.generate(prompt=prompt, system_prompt=SYSTEM_PROMPT)
         return {"response": response_text, "query_type": query_type}
 
     # ------------------------------------------------------------------
@@ -120,7 +123,7 @@ class LLMClient:
             },
         }
 
-        for attempt in range(max_retries):
+        for _ in range(max_retries):
             try:
                 r = requests.post(
                     self.api_url,
@@ -139,7 +142,6 @@ class LLMClient:
                 if r.status_code in {404, 410, 429, 503}:
                     return None
 
-                # Other errors
                 return None
 
             except requests.RequestException:
@@ -148,23 +150,37 @@ class LLMClient:
 
         return None
 
-    def _generate_via_local_model(
-        self, full_prompt: str, max_tokens: int
-    ) -> str:
+    def _generate_via_local_model(self, prompt: str, max_tokens: int) -> str:
         """
         Local transformers fallback (always works).
-        """
-        if self._local_pipeline is None:
-            from transformers import pipeline
 
+        Key fix:
+        - Truncate inputs to avoid exceeding flan-t5-small max length (512).
+        """
+        if self._local_pipeline is None or self._local_tokenizer is None:
+            from transformers import AutoTokenizer, pipeline
+
+            self._local_tokenizer = AutoTokenizer.from_pretrained(self.local_model_id)
             self._local_pipeline = pipeline(
                 "text2text-generation",
                 model=self.local_model_id,
             )
 
+        # flan-t5-small typically supports 512 input tokens; keep buffer
+        inputs = self._local_tokenizer(
+            prompt,
+            truncation=True,
+            max_length=480,
+            return_tensors="pt",
+        )
+        truncated_prompt = self._local_tokenizer.decode(
+            inputs["input_ids"][0],
+            skip_special_tokens=True,
+        )
+
         out = self._local_pipeline(
-            full_prompt,
-            max_new_tokens=max_tokens,
+            truncated_prompt,
+            max_new_tokens=min(max_tokens, 256),
             do_sample=False,
         )
 
@@ -172,4 +188,5 @@ class LLMClient:
             return out[0].get("generated_text", "").strip()
 
         return str(out)
+
 
