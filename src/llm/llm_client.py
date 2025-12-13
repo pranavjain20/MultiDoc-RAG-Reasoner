@@ -1,40 +1,47 @@
 """
-LLM Client with HuggingFace Hub InferenceClient + local transformers fallback.
+LLM Client with Groq (smart) + local transformers fallback.
 
 Priority:
-1) Hugging Face Inference (via huggingface_hub.InferenceClient) if HF_TOKEN is set and call succeeds
+1) Groq chat completion (if GROQ_API_KEY is set)
 2) Local transformers fallback (always works)
+
+NOTE:
+- HuggingFace legacy Inference API `api-inference.huggingface.co` is deprecated (410).
+- HF Router exists, but it is OpenAI-compatible chat-first and not a drop-in
+  replacement for the old `POST /models/{repo_id}` pattern for all models.
 """
 
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
 from llm.prompts import SYSTEM_PROMPT
 from llm.reasoning import MultiDocReasoner
 
+# Groq wrapper (separate file)
+from llm.llm_api_groq import generate_llm_response
+
 
 class LLMClient:
-    """Client for multi-backend text generation (HF -> Local)."""
+    """Client for multi-backend text generation (Groq → Local)."""
 
     def __init__(
         self,
-        model_id: str = "google/flan-t5-large",
         local_model_id: str = "google/flan-t5-base",
+        groq_model_name: Optional[str] = None,
     ) -> None:
         load_dotenv()
 
-        # HF Inference
-        self.hf_token = os.getenv("HF_TOKEN")  # optional
-        self.model_id = model_id
-        self._hf_client = None  # lazy init
+        # Groq (smart)
+        self.groq_api_key = os.getenv("GROQ_API_KEY")
+        self.groq_model_name = groq_model_name  # optional override
 
         # Defaults
         self.default_temperature = 0.2
         self.default_max_tokens = 512
 
-        # Local fallback
+        # Local fallback (always available)
         self.local_model_id = local_model_id
         self._local_pipeline = None
         self._local_tokenizer = None
@@ -51,97 +58,92 @@ class LLMClient:
     ) -> str:
         """
         Generate text from a single prompt string.
-
-        Notes:
-        - In this repo, `prompt` is often already a structured prompt produced by MultiDocReasoner.
+        In this repo, `prompt` is often already a structured prompt produced by
+        `MultiDocReasoner.build_prompt(...)`.
         """
-        if temperature is None:
-            temperature = self.default_temperature
-        if max_tokens is None:
-            max_tokens = self.default_max_tokens
+        temperature = self.default_temperature if temperature is None else temperature
+        max_tokens = self.default_max_tokens if max_tokens is None else max_tokens
 
-        # HF call: keep system prompt in-text (works with T5-style text2text)
-        if system_prompt:
-            full_prompt = f"System: {system_prompt}\n\nQuestion: {prompt}\n\nAnswer:"
-        else:
-            full_prompt = f"Question: {prompt}\n\nAnswer:"
+        # 1) Groq (preferred)
+        if self.groq_api_key:
+            # For chat models, it's cleaner to pass `prompt` as "question" and keep context empty,
+            # because the prompt already contains the retrieved text.
+            try:
+                full_prompt = (
+                    f"{system_prompt}\n\n{prompt}"
+                    if system_prompt
+                    else prompt
+                )
+                return generate_llm_response(
+                    question=full_prompt,
+                    context=None,
+                    model_name=self.groq_model_name,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    system_prompt=system_prompt or SYSTEM_PROMPT,
+                )
+            except Exception:
+                # fall through to local
+                pass
 
-        # 1) Try HF (only if token exists)
-        hf_out = self._generate_via_hf(full_prompt, temperature=temperature, max_tokens=max_tokens)
-        if hf_out is not None and hf_out.strip():
-            return hf_out.strip()
-
-        # 2) Local fallback: shorter prompt reduces “instruction echo”
+        # 2) Local fallback
+        # Keep local prompt short to avoid instruction-echo.
         local_prompt = f"Question: {prompt}\n\nAnswer:"
-        return self._generate_via_local_model(local_prompt, max_tokens=max_tokens)
+        return self._generate_via_local_model(local_prompt, max_tokens)
 
     def generate_with_reasoning(
         self,
         question: str,
-        chunks: List[Union[Dict[str, str], str]],
+        chunks: List[Dict[str, str]],
         reasoner: MultiDocReasoner,
     ) -> Dict[str, Any]:
-        """High-level wrapper used by UI and evaluation."""
+        """
+        High-level wrapper used by UI and evaluation.
+
+        - Keep your existing reasoner (query_type classification + prompt structuring).
+        - If Groq exists: send (question + grouped context) to Groq (best quality).
+        - Else: fallback to local using your structured prompt.
+        """
         prompt, query_type = reasoner.build_prompt(question, chunks)
+
+        # If Groq is available, build a cleaner context string (better than stuffing everything into one mega prompt)
+        if self.groq_api_key:
+            try:
+                chunks_by_doc = reasoner.organize_chunks_by_doc(chunks)
+                context_parts: List[str] = []
+                for doc_name, doc_chunks in chunks_by_doc.items():
+                    context_parts.append(f"--- {doc_name} ---")
+                    for c in doc_chunks:
+                        txt = (c.get("text") or "").strip()
+                        if txt:
+                            context_parts.append(txt)
+                context = "\n\n".join(context_parts).strip()
+
+                response_text = generate_llm_response(
+                    question=question,
+                    context=context,
+                    model_name=self.groq_model_name,
+                    temperature=self.default_temperature,
+                    max_tokens=self.default_max_tokens,
+                    system_prompt=SYSTEM_PROMPT,
+                )
+                return {"response": response_text, "query_type": query_type}
+            except Exception:
+                # fallback to local prompt path
+                pass
+
         response_text = self.generate(prompt=prompt, system_prompt=SYSTEM_PROMPT)
         return {"response": response_text, "query_type": query_type}
 
     # ------------------------------------------------------------------
-    # HF inference (huggingface_hub)
-    # ------------------------------------------------------------------
-    def _get_hf_client(self):
-        if self._hf_client is None:
-            from huggingface_hub import InferenceClient
-
-            # Force provider to "hf-inference" so it uses the new Inference Providers / router logic.
-            # (This avoids you hand-crafting router URLs that may 404/410.)
-            self._hf_client = InferenceClient(
-                model=self.model_id,
-                provider="hf-inference",
-                token=self.hf_token,
-                timeout=60,
-            )
-        return self._hf_client
-
-    def _generate_via_hf(self, full_prompt: str, temperature: float, max_tokens: int) -> Optional[str]:
-        if not self.hf_token:
-            return None
-
-        try:
-            client = self._get_hf_client()
-
-            # flan-t5-* is text2text (seq2seq). However, not all providers expose a dedicated
-            # text2text endpoint consistently; text_generation is the most broadly supported.
-            # It accepts `truncate` which helps with long prompts.
-            out = client.text_generation(
-                prompt=full_prompt,
-                max_new_tokens=max_tokens,
-                temperature=temperature,
-                return_full_text=False,
-                truncate=2048,  # prevents provider-side errors on long prompts
-            )
-
-            # huggingface_hub returns either `str` or a structured output depending on backend.
-            if isinstance(out, str):
-                return out
-            # Sometimes it's a dataclass-like object with .generated_text
-            if hasattr(out, "generated_text"):
-                return getattr(out, "generated_text") or ""
-            return str(out)
-
-        except Exception:
-            # Any HF error -> fallback to local
-            return None
-
-    # ------------------------------------------------------------------
-    # Local transformers fallback
+    # Local fallback
     # ------------------------------------------------------------------
     def _generate_via_local_model(self, prompt: str, max_tokens: int) -> str:
         """
         Local transformers fallback.
 
-        Key fix:
-        - Truncate inputs to avoid exceeding model max length (T5 family tends to be strict).
+        - Truncates inputs to avoid exceeding model limits.
+        - Uses text2text-generation pipeline for FLAN-T5.
         """
         if self._local_pipeline is None or self._local_tokenizer is None:
             from transformers import AutoTokenizer, pipeline
@@ -152,10 +154,11 @@ class LLMClient:
                 model=self.local_model_id,
             )
 
+        # Keep input bounded (flan-t5-base max input ~512 tokens typical; we keep safe)
         inputs = self._local_tokenizer(
             prompt,
             truncation=True,
-            max_length=768,
+            max_length=480,
             return_tensors="pt",
         )
         truncated_prompt = self._local_tokenizer.decode(
