@@ -20,6 +20,7 @@ This repo contains the core backend used in our COMS 4995 final project
 │   └── evaluation_chunks.json
 ├── examples/
 │   ├── build_index.py          # Offline ingestion + FAISS index builder
+│   ├── build_UI.py             # UI
 │   ├── export_evaluation_chunks.py   # Retrieval → export top-k chunks
 │   ├── evaluation.py           # E1–E4 evaluation driver
 │   ├── test_llm_client.py
@@ -413,7 +414,7 @@ All results will appear in `evaluation_outputs/`.
 
 ## 7. Web UI (Gradio Demo)
 
-We provide an interactive web interface for the multi-document RAG system in `examples/demo_app.py`.
+We provide an interactive web interface for the multi-document RAG system in `examples/build_UI.py  `.
 
 ### 7.1 Features
 
@@ -426,7 +427,7 @@ We provide an interactive web interface for the multi-document RAG system in `ex
 ### 7.2 Running the UI
 ```bash
 export PYTHONPATH=src
-python examples/demo_app.py
+python examples/build_UI.py  
 ```
 
 The interface will launch at `http://localhost:7860`.
