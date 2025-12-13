@@ -414,7 +414,7 @@ All results will appear in `evaluation_outputs/`.
 
 ## 7. Web UI (Gradio Demo)
 
-We provide an interactive web interface for the multi-document RAG system in `examples/build_UI.py  `.
+We provide an interactive web interface for the multi-document RAG system in `examples/build_UI.py.
 
 ### 7.1 Features
 
