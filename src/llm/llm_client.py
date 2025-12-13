@@ -1,16 +1,14 @@
 """
-LLM Client with HuggingFace Router API + local transformers fallback.
+LLM Client with HuggingFace Hub InferenceClient + local transformers fallback.
 
 Priority:
-1) HuggingFace Router (if HF_TOKEN is set and endpoint works)
+1) Hugging Face Inference (via huggingface_hub.InferenceClient) if HF_TOKEN is set and call succeeds
 2) Local transformers fallback (always works)
 """
 
 import os
-import time
 from typing import Any, Dict, List, Optional, Union
 
-import requests
 from dotenv import load_dotenv
 
 from llm.prompts import SYSTEM_PROMPT
@@ -18,7 +16,7 @@ from llm.reasoning import MultiDocReasoner
 
 
 class LLMClient:
-    """Client for multi-backend text generation (HF Router → Local)."""
+    """Client for multi-backend text generation (HF -> Local)."""
 
     def __init__(
         self,
@@ -27,18 +25,16 @@ class LLMClient:
     ) -> None:
         load_dotenv()
 
-        self.hf_token = os.getenv("HF_TOKEN")
+        # HF Inference
+        self.hf_token = os.getenv("HF_TOKEN")  # optional
         self.model_id = model_id
+        self._hf_client = None  # lazy init
 
-        # ✅ HuggingFace Router endpoint (HF now requires this)
-        self.api_url = f"https://router.huggingface.co/models/{model_id}"
-        self.hf_headers = (
-            {"Authorization": f"Bearer {self.hf_token}"} if self.hf_token else {}
-        )
-
+        # Defaults
         self.default_temperature = 0.2
         self.default_max_tokens = 512
 
+        # Local fallback
         self.local_model_id = local_model_id
         self._local_pipeline = None
         self._local_tokenizer = None
@@ -52,32 +48,32 @@ class LLMClient:
         system_prompt: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        max_retries: int = 2,
     ) -> str:
+        """
+        Generate text from a single prompt string.
+
+        Notes:
+        - In this repo, `prompt` is often already a structured prompt produced by MultiDocReasoner.
+        """
         if temperature is None:
             temperature = self.default_temperature
         if max_tokens is None:
             max_tokens = self.default_max_tokens
 
-        # For HF, keep the system prompt in a single string (works ok for T5)
+        # HF call: keep system prompt in-text (works with T5-style text2text)
         if system_prompt:
             full_prompt = f"System: {system_prompt}\n\nQuestion: {prompt}\n\nAnswer:"
         else:
             full_prompt = f"Question: {prompt}\n\nAnswer:"
 
-        # 1) Try HF Router
-        api_result = self._generate_via_hf_router(
-            full_prompt=full_prompt,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            max_retries=max_retries,
-        )
-        if api_result is not None:
-            return api_result
+        # 1) Try HF (only if token exists)
+        hf_out = self._generate_via_hf(full_prompt, temperature=temperature, max_tokens=max_tokens)
+        if hf_out is not None and hf_out.strip():
+            return hf_out.strip()
 
-        # 2) Local fallback (short prompt to reduce instruction echo)
+        # 2) Local fallback: shorter prompt reduces “instruction echo”
         local_prompt = f"Question: {prompt}\n\nAnswer:"
-        return self._generate_via_local_model(local_prompt, max_tokens)
+        return self._generate_via_local_model(local_prompt, max_tokens=max_tokens)
 
     def generate_with_reasoning(
         self,
@@ -85,94 +81,68 @@ class LLMClient:
         chunks: List[Union[Dict[str, str], str]],
         reasoner: MultiDocReasoner,
     ) -> Dict[str, Any]:
+        """High-level wrapper used by UI and evaluation."""
         prompt, query_type = reasoner.build_prompt(question, chunks)
         response_text = self.generate(prompt=prompt, system_prompt=SYSTEM_PROMPT)
         return {"response": response_text, "query_type": query_type}
 
     # ------------------------------------------------------------------
-    # HF Router
+    # HF inference (huggingface_hub)
     # ------------------------------------------------------------------
-    def _generate_via_hf_router(
-        self,
-        full_prompt: str,
-        temperature: float,
-        max_tokens: int,
-        max_retries: int,
-    ) -> Optional[str]:
+    def _get_hf_client(self):
+        if self._hf_client is None:
+            from huggingface_hub import InferenceClient
+
+            # Force provider to "hf-inference" so it uses the new Inference Providers / router logic.
+            # (This avoids you hand-crafting router URLs that may 404/410.)
+            self._hf_client = InferenceClient(
+                model=self.model_id,
+                provider="hf-inference",
+                token=self.hf_token,
+                timeout=60,
+            )
+        return self._hf_client
+
+    def _generate_via_hf(self, full_prompt: str, temperature: float, max_tokens: int) -> Optional[str]:
         if not self.hf_token:
             return None
 
-        payload = {
-            "inputs": full_prompt,
-            "parameters": {
-                "max_new_tokens": max_tokens,
-                "temperature": temperature,
-                "return_full_text": False,
-            },
-        }
+        try:
+            client = self._get_hf_client()
 
-        for attempt in range(max_retries):
-            try:
-                r = requests.post(
-                    self.api_url,
-                    headers=self.hf_headers,
-                    json=payload,
-                    timeout=60,
-                )
+            # flan-t5-* is text2text (seq2seq). However, not all providers expose a dedicated
+            # text2text endpoint consistently; text_generation is the most broadly supported.
+            # It accepts `truncate` which helps with long prompts.
+            out = client.text_generation(
+                prompt=full_prompt,
+                max_new_tokens=max_tokens,
+                temperature=temperature,
+                return_full_text=False,
+                truncate=2048,  # prevents provider-side errors on long prompts
+            )
 
-                # HF Router can return JSON errors even with 200 sometimes; parse safely
-                try:
-                    out = r.json()
-                except Exception:
-                    return None
+            # huggingface_hub returns either `str` or a structured output depending on backend.
+            if isinstance(out, str):
+                return out
+            # Sometimes it's a dataclass-like object with .generated_text
+            if hasattr(out, "generated_text"):
+                return getattr(out, "generated_text") or ""
+            return str(out)
 
-                if r.status_code == 200:
-                    # Most common: list of dicts
-                    if isinstance(out, list) and out:
-                        item = out[0]
-                        if isinstance(item, dict):
-                            return (item.get("generated_text") or "").strip()
-                        # sometimes item is string
-                        if isinstance(item, str):
-                            return item.strip()
-                        return str(item).strip()
-
-                    # Sometimes: dict
-                    if isinstance(out, dict):
-                        # If HF returns an error in dict form, fallback
-                        if "error" in out:
-                            return None
-                        if "generated_text" in out:
-                            return (out.get("generated_text") or "").strip()
-                        # Some backends use "summary_text"
-                        if "summary_text" in out:
-                            return (out.get("summary_text") or "").strip()
-                        return None
-
-                    # Fallback to string
-                    if isinstance(out, str):
-                        return out.strip()
-
-                    return None
-
-                # transient/rate limit/loading → fallback
-                if r.status_code in {429, 503}:
-                    time.sleep(2 + attempt * 2)
-                    continue
-
-                # other status codes -> fallback to local
-                return None
-
-            except requests.RequestException:
-                time.sleep(2 + attempt * 2)
-                continue
-
-        return None
+        except Exception:
+            # Any HF error -> fallback to local
+            return None
 
     # ------------------------------------------------------------------
-    # Local fallback
+    # Local transformers fallback
     # ------------------------------------------------------------------
     def _generate_via_local_model(self, prompt: str, max_tokens: int) -> str:
+        """
+        Local transformers fallback.
+
+        Key fix:
+        - Truncate inputs to avoid exceeding model max length (T5 family tends to be strict).
+        """
         if self._local_pipeline is None or self._local_tokenizer is None:
             from transformers import AutoTokenizer, pipeline
 
@@ -182,7 +152,6 @@ class LLMClient:
                 model=self.local_model_id,
             )
 
-        # keep inputs bounded
         inputs = self._local_tokenizer(
             prompt,
             truncation=True,
@@ -203,6 +172,6 @@ class LLMClient:
         if isinstance(out, list) and out and isinstance(out[0], dict):
             return (out[0].get("generated_text") or "").strip()
 
-        return str(out)
+        return str(out).strip()
 
 
