@@ -1,9 +1,11 @@
-#UI code
+# UI code
 
 import os
 import shutil
+import re
 from pathlib import Path
 from typing import List, Tuple, Dict
+
 import gradio as gr
 from dotenv import load_dotenv
 
@@ -11,6 +13,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+
 from llm.reasoning import MultiDocReasoner
 from llm.llm_client import LLMClient
 
@@ -20,8 +23,67 @@ CHUNK_SIZE = 800
 CHUNK_OVERLAP = 150
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 RETRIEVAL_K = 6
+RETRIEVAL_FETCH_K = max(RETRIEVAL_K * 3, 12)
+
 INDEX_STORE_PATH = "index_store"
 UPLOAD_DIR = "ui_uploads"
+
+# =========================================================
+# Chunk filtering (CRITICAL FIX)
+# =========================================================
+
+_BAD_PATTERNS = [
+    r"\breferences\b",
+    r"\bbibliography\b",
+    r"\bworks cited\b",
+    r"\bappendix\b",
+    r"\backnowledg(e)?ments?\b",
+    r"\bproceedings\b",
+    r"\bassociation for computational linguistics\b",
+    r"\bet al\.\b",
+    r"\bdoi\b",
+    r"\barxiv\b",
+    r"\bjournal\b",
+    r"\bvol\.\b",
+    r"\bno\.\b",
+    r"\bpages?\b",
+]
+
+def _looks_like_references(text: str) -> bool:
+    t = (text or "").strip()
+    if len(t) < 60:
+        return True
+
+    low = t.lower()
+    if any(re.search(p, low) for p in _BAD_PATTERNS):
+        return True
+
+    year_hits = len(re.findall(r"\b(19|20)\d{2}\b", t))
+    if year_hits >= 3:
+        return True
+
+    bracket_hits = len(re.findall(r"\[\d+\]", t))
+    if bracket_hits >= 3:
+        return True
+
+    digits = sum(ch.isdigit() for ch in t)
+    punct = sum(ch in ".,;:()[]{}" for ch in t)
+    ratio = (digits + punct) / max(len(t), 1)
+    if ratio > 0.22:
+        return True
+
+    return False
+
+def filter_chunks(chunks: List[Dict], keep: int = RETRIEVAL_K) -> List[Dict]:
+    clean = []
+    for c in chunks:
+        txt = (c.get("text") or "").strip()
+        if not _looks_like_references(txt):
+            clean.append(c)
+        if len(clean) >= keep:
+            break
+    return clean
+
 
 # =========================================================
 # Uploading File
@@ -30,10 +92,10 @@ UPLOAD_DIR = "ui_uploads"
 def save_uploads(files) -> List[str]:
     if not files:
         return []
-    
+
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     saved_paths = []
-    
+
     for file in files:
         if file is None:
             continue
@@ -41,7 +103,7 @@ def save_uploads(files) -> List[str]:
         dest_path = os.path.join(UPLOAD_DIR, filename)
         shutil.copy(file.name, dest_path)
         saved_paths.append(dest_path)
-    
+
     return saved_paths
 
 
@@ -49,59 +111,60 @@ def build_index_from_pdfs(pdf_paths: List[str]) -> str:
     try:
         if not pdf_paths:
             return "No files uploaded"
-        
+
         all_docs = []
         doc_count = 0
-        
+
         for pdf_path in pdf_paths:
-            try:
-                loader = PyPDFLoader(pdf_path)
-                docs = loader.load()
-                for doc in docs:
-                    doc.metadata['source'] = os.path.basename(pdf_path)
-                all_docs.extend(docs)
-                doc_count += 1
-            except Exception as e:
-                return f"Error loading {os.path.basename(pdf_path)}: {str(e)}"
-        
+            loader = PyPDFLoader(pdf_path)
+            docs = loader.load()
+            for doc in docs:
+                doc.metadata["source"] = os.path.basename(pdf_path)
+            all_docs.extend(docs)
+            doc_count += 1
+
         if not all_docs:
             return "No pages loaded from PDFs"
-        
+
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=CHUNK_SIZE,
             chunk_overlap=CHUNK_OVERLAP,
-            length_function=len
+            length_function=len,
         )
         chunks = text_splitter.split_documents(all_docs)
-        
+
         embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-        
-        # Build and save index
         vectorstore = FAISS.from_documents(chunks, embeddings)
+
         os.makedirs(INDEX_STORE_PATH, exist_ok=True)
         vectorstore.save_local(INDEX_STORE_PATH)
-        
+
         return f"Index created\n{len(all_docs)} pages → {len(chunks)} chunks from {doc_count} documents"
-        
+
     except Exception as e:
         return f"Build failed: {str(e)}"
+
 
 # =========================================================
 # Retriever
 # =========================================================
+
 def load_retriever():
     try:
         if not os.path.exists(INDEX_STORE_PATH):
             return None
-        
+
         embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
         vectorstore = FAISS.load_local(
             INDEX_STORE_PATH,
             embeddings,
-            allow_dangerous_deserialization=True
+            allow_dangerous_deserialization=True,
         )
-        return vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
-        
+
+        return vectorstore.as_retriever(
+            search_kwargs={"k": RETRIEVAL_FETCH_K}
+        )
+
     except Exception as e:
         print(f"Error loading retriever: {e}")
         return None
@@ -110,91 +173,86 @@ def load_retriever():
 def retrieve_chunks(question: str, retriever) -> List[Dict]:
     if not retriever:
         return []
-    
-    try:
-        docs = retriever.invoke(question)
-        chunks = []
-        for doc in docs:
-            chunk = {
-                "doc_name": doc.metadata.get('source', 'Unknown.pdf'),
-                "text": doc.page_content
-            }
-            chunks.append(chunk)
-        return chunks
-        
-    except Exception as e:
-        print(f"Error retrieving chunks: {e}")
-        return []
 
+    docs = retriever.invoke(question)
+
+    chunks = []
+    for doc in docs:
+        chunks.append(
+            {
+                "doc_name": doc.metadata.get("source", "Unknown.pdf"),
+                "text": doc.page_content,
+            }
+        )
+
+    return filter_chunks(chunks, keep=RETRIEVAL_K)
+
+
+# =========================================================
+# QA Pipeline
+# =========================================================
 
 def answer_question(question: str) -> Tuple[str, str, str]:
+    if not os.path.exists(INDEX_STORE_PATH):
+        return ("Build an index first (Setup tab)", "", "")
+
+    if not question or not question.strip():
+        return ("Enter a question", "", "")
+
+    retriever = load_retriever()
+    if not retriever:
+        return ("Failed to load index", "", "")
+
+    chunks = retrieve_chunks(question, retriever)
+    if not chunks:
+        return ("No relevant information found", "", "")
+
+    if not (os.getenv("GROQ_API_KEY") or os.getenv("HF_TOKEN")):
+        return (
+            "Missing GROQ_API_KEY or HF_TOKEN in .env (need at least one)",
+            "",
+            format_evidence(chunks),
+        )
+
     try:
-        # Validation
-        if not os.path.exists(INDEX_STORE_PATH):
-            return (
-                "Build an index first (Setup tab)",
-                "",
-                ""
-            )
-        
-        if not question or not question.strip():
-            return ("Enter a question", "", "")
-        
-        # Load retriever
-        retriever = load_retriever()
-        if not retriever:
-            return ("Failed to load index", "", "")
-        
-        # Retrieve chunks
-        chunks = retrieve_chunks(question, retriever)
-        if not chunks:
-            return ("No relevant information found", "", "")
-        
-        if not os.getenv("HF_TOKEN"):
-            return (
-                "Missing HF_TOKEN in .env file",
-                "",
-                format_evidence(chunks)
-            )
-        
-        # Generate answer
-        try:
-            client = LLMClient()
-            reasoner = MultiDocReasoner()
-            
-            result = client.generate_with_reasoning(
-                question=question,
-                chunks=chunks,
-                reasoner=reasoner
-            )
-            
-            answer = result.get('response', 'No answer generated')
-            query_type = result.get('query_type', 'unknown')
-            evidence = format_evidence(chunks)
-            
-            return (answer, query_type, evidence)
-            
-        except Exception as e:
-            error_msg = f"API Error: {str(e)}\n\nPossible causes:\n• Invalid HF_TOKEN\n• Rate limits\n• Model loading (wait 20s)"
-            return (error_msg, "", format_evidence(chunks))
-        
+        client = LLMClient()
+        reasoner = MultiDocReasoner()
+
+        result = client.generate_with_reasoning(
+            question=question,
+            chunks=chunks,
+            reasoner=reasoner,
+        )
+
+        return (
+            result.get("response", "No answer generated"),
+            result.get("query_type", "unknown"),
+            format_evidence(chunks),
+        )
+
     except Exception as e:
-        return (f"Error: {str(e)}", "", "")
+        return (
+            f"API Error: {str(e)}",
+            "",
+            format_evidence(chunks),
+        )
 
 
 def format_evidence(chunks: List[Dict]) -> str:
-    if not chunks:
-        return "No evidence"
-    
     parts = [f"Retrieved {len(chunks)} chunks:\n"]
-    
-    for i, chunk in enumerate(chunks, 1):
-        doc_name = chunk.get('doc_name', 'Unknown')
-        text = chunk.get('text', '')
-        preview = text[:250] + "..." if len(text) > 250 else text
-        parts.append(f"\n[{i}] {doc_name}\n{preview}\n")
-    
+    for i, c in enumerate(chunks, 1):
+        preview = c["text"][:250] + ("..." if len(c["text"]) > 250 else "")
+        parts.append(f"\n[{i}] {c['doc_name']}\n{preview}\n")
     return "\n".join(parts)
+
+
+# =========================================================
+# UI (UNCHANGED)
+# =========================================================
+# ⚠️ 下面 UI / CSS / footer / tabs
+# ⚠️ 与你原文件完全一致
+# ⚠️ 我没有删一行
+
 
 
 # =========================================================
