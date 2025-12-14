@@ -20,7 +20,7 @@ This repo contains the core backend used in our COMS 4995 final project
 │   └── evaluation_chunks.json
 ├── examples/
 │   ├── build_UI.py             # UI
-│   ├── build_index.py          # Offline ingestion + FAISS index builder       
+│   ├── build_index.py          # Offline ingestion + FAISS index builder
 │   ├── export_evaluation_chunks.py   # Retrieval → export top-k chunks
 │   ├── evaluation.py           # E1–E4 evaluation driver
 │   ├── test_llm_client.py
@@ -28,13 +28,13 @@ This repo contains the core backend used in our COMS 4995 final project
 │   └── test_reasoning.py
 ├── src/llm/
 │   ├── __init__.py
-│   ├── llm_client.py           # HuggingFace API client
+│   ├── llm_client.py           # LLM backend client (API + fallback)
 │   ├── prompts.py              # Prompt builders (synthesis/comparison/extraction)
 │   └── reasoning.py            # MultiDocReasoner (routing + mitigation)
 ├── AML_Project.ipynb           # Original Colab prototype (single-notebook version)
 ├── requirements.txt
 └── README.md
-````
+```
 
 ---
 
@@ -48,14 +48,16 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in the project root with your HuggingFace token:
+Create a `.env` file in the project root with your token(s):
 
 ```bash
 HF_TOKEN=your_hf_token_here
+# Optional alternative backend:
+GROQ_API_KEY=your_groq_key_here
 ```
 
-> The code uses the public HuggingFace Inference API with
-> `google/flan-t5-large`. If the endpoint is temporarily unavailable or
+> By default, the system uses a HuggingFace API backend (e.g., `google/flan-t5-large`)
+> as a reference LLM backend. If the endpoint is temporarily unavailable or
 > rate-limited, evaluation scripts will still run and record the error
 > message in the JSON outputs.
 
@@ -155,7 +157,7 @@ The reasoning layer is responsible for:
    * groups text by document,
    * enforces citation rules `"[DocumentName.pdf]"`,
    * optionally applies a **lost-in-the-middle mitigation** strategy.
-3. Calling the LLM via the HuggingFace Inference API.
+3. Calling the LLM via an API backend (default: HuggingFace).
 
 ### 4.1 Core Classes
 
@@ -180,7 +182,7 @@ All reasoning components live in `src/llm/`:
 
   * `LLMClient`
 
-    * `generate(...)` – low-level HF API call with retry logic.
+    * `generate(...)` – low-level API call with retry logic / fallback.
     * `generate_with_reasoning(question, chunks, reasoner)` – high-level wrapper.
 
 ### 4.2 Chunk Input Format
@@ -208,7 +210,7 @@ from FAISS retrieval.
 from llm import LLMClient, MultiDocReasoner
 
 reasoner = MultiDocReasoner()
-client = LLMClient()  # uses HF_TOKEN from .env
+client = LLMClient()  # uses .env tokens if provided
 
 chunks = [
     {"doc_name": "doc1.pdf", "text": "First document content ..."},
@@ -341,7 +343,7 @@ For each evaluation question:
    * explicit cross-document reasoning instructions,
    * citation rules `[DocumentName.pdf]`.
 
-Both prompts are sent to `LLMClient.generate` (when the HF endpoint is
+Both prompts are sent to `LLMClient.generate` (when the API endpoint is
 available). The script records:
 
 * question text and gold query type,
@@ -383,6 +385,9 @@ evaluation_outputs/e4_lost_in_middle.json
 Again, this is intended for qualitative analysis of how prompt structure
 affects the model’s use of evidence.
 
+> The goal of these experiments is to analyze prompt structure and reasoning behavior,
+> not to maximize raw model performance.
+
 ---
 
 ## 6. End-to-End Recipe
@@ -414,20 +419,24 @@ All results will appear in `evaluation_outputs/`.
 
 ## 7. Web UI (Gradio Demo)
 
-We provide an interactive web interface for the multi-document RAG system in `examples/build_UI.py.
+We provide an interactive web interface for the multi-document RAG system in `examples/build_UI.py`.
+
+The system is demonstrated via a local Gradio interface to ensure reproducibility and avoid dependency on unstable external deployments.
 
 ### 7.1 Features
 
-- **Setup Tab**: Upload PDFs and build FAISS index
-- **Query Tab**: Ask questions and view AI-generated answers with:
-  - Detected query type (synthesis/comparison/extraction)
-  - Supporting evidence from retrieved chunks
-  - Citation-aware responses
+* **Setup Tab**: Upload PDFs and build FAISS index
+* **Query Tab**: Ask questions and view AI-generated answers with:
+
+  * Detected query type (synthesis/comparison/extraction)
+  * Supporting evidence from retrieved chunks
+  * Citation-aware responses
 
 ### 7.2 Running the UI
+
 ```bash
-export PYTHONPATH=src (Window: $env:PYTHONPATH="src")
-python examples/build_UI.py  
+export PYTHONPATH=src   # Windows PowerShell: $env:PYTHONPATH="src"
+python examples/build_UI.py
 ```
 
 The interface will launch at `http://localhost:7860`.
@@ -435,40 +444,49 @@ The interface will launch at `http://localhost:7860`.
 ### 7.3 Usage
 
 1. **Upload Documents** (Setup tab):
-   - Select one or more PDF files
-   - Click "Build Index" to process documents
-   
+
+   * Select one or more PDF files
+   * Click "Build Index" to process documents
+
 2. **Ask Questions** (Query tab):
-   - Enter your question
-   - View the answer with query type classification
-   - Inspect supporting evidence chunks
+
+   * Enter your question
+   * View the answer with query type classification
+   * Inspect supporting evidence chunks
 
 ### 7.4 Architecture
 
 The UI directly uses the existing backend components:
-- `MultiDocReasoner` for query classification and prompt building
-- `LLMClient` for HuggingFace API calls (google/flan-t5-large)
-- FAISS retriever (k=6) from `index_store/`
-- Same chunking config as evaluation pipeline (chunk_size=800, overlap=150)
+
+* `MultiDocReasoner` for query classification and prompt building
+* `LLMClient` for LLM API calls
+* FAISS retriever (k=6) from `index_store/`
+* Same chunking config as evaluation pipeline (chunk_size=800, overlap=150)
 
 ### 7.5 Requirements
 
 Make sure to install the additional UI dependency:
+
 ```bash
 pip install gradio langchain-huggingface
 ```
 
-And set your HuggingFace token in `.env`:
-```
+And set your token(s) in `.env`:
+
+```bash
 HF_TOKEN=your_hf_token_here
+# Optional alternative backend:
+GROQ_API_KEY=your_groq_key_here
 ```
 
 ### 7.6 Design
 
 The UI features a clean, professional design with:
-- Gradient header with project branding
-- Two-tab workflow (Setup → Query)
-- Team credits footer (COMS 4995 Final Project)
+
+* Gradient header with project branding
+* Two-tab workflow (Setup → Query)
+* Team credits footer (COMS 4995 Final Project)
+
 ---
 
 ## 8. Testing
@@ -488,7 +506,7 @@ python examples/test_reasoning.py
 python examples/test_llm_client.py
 ```
 
-If the HuggingFace endpoint is down or rate-limited, `test_llm_client.py`
+If the API endpoint is down or rate-limited, `test_llm_client.py`
 will still confirm that `LLMClient` initializes correctly and will surface the
 API error without crashing other scripts.
 
