@@ -5,28 +5,21 @@ Groq LLM API wrapper for the Multi-Document RAG system.
 from __future__ import annotations
 
 import os
-from typing import Optional, List
+from typing import Optional
 
 from groq import Groq
-from groq import BadRequestError
 
 
-# Human-readable names exposed in UI (optional)
+# Human-readable names exposed in the UI (if you add dropdown later)
 AVAILABLE_MODELS = {
-    "LLaMA 3.3 70B (best)": "llama-3.3-70b-versatile",
     "LLaMA 3.1 8B (fast)": "llama-3.1-8b-instant",
-    "Mixtral 8x7B (long context)": "mixtral-8x7b-32768",
+    # ✅ 70B 3.1 已下线；用 3.3
+    "LLaMA 3.3 70B (better)": "llama-3.3-70b-versatile",
+    "LLaMA 3.3 70B (specdec)": "llama-3.3-70b-specdec",
+    # Mixtral 8x7b-32768 也在 deprecations 里，尽量别当默认
 }
 
-# ✅ Default to the strongest available
-DEFAULT_MODEL = AVAILABLE_MODELS["LLaMA 3.3 70B (best)"]
-
-# If a model is decommissioned, try these in order
-FALLBACK_MODELS: List[str] = [
-    AVAILABLE_MODELS["LLaMA 3.3 70B (best)"],
-    AVAILABLE_MODELS["Mixtral 8x7B (long context)"],
-    AVAILABLE_MODELS["LLaMA 3.1 8B (fast)"],
-]
+DEFAULT_MODEL = AVAILABLE_MODELS["LLaMA 3.3 70B (better)"]
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a careful teaching assistant for a data science / NLP course project.
@@ -35,7 +28,7 @@ You are a careful teaching assistant for a data science / NLP course project.
 - If the context is not enough to answer confidently, say:
   "I don't know based on the documents."
 - Prefer short, precise answers unless asked for details.
-- Cite sources using the format [DocumentName.pdf] when referencing evidence.
+- When comparing documents, explicitly mention which document supports each claim.
 """.strip()
 
 
@@ -62,41 +55,21 @@ def generate_llm_response(
         raise RuntimeError("GROQ_API_KEY is not set in the environment.")
 
     client = Groq(api_key=api_key)
+    model_name = model_name or DEFAULT_MODEL
+
     user_content = _build_user_prompt(question, context)
 
-    # Try requested model first, then fallbacks
-    tried = []
-    candidates = []
-    if model_name:
-        candidates.append(model_name)
-    candidates += [m for m in FALLBACK_MODELS if m not in candidates]
+    completion = client.chat.completions.create(
+        model=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+    )
 
-    last_err: Optional[Exception] = None
+    message = completion.choices[0].message
+    return (message.content or "").strip()
 
-    for m in candidates:
-        tried.append(m)
-        try:
-            completion = client.chat.completions.create(
-                model=m,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                ],
-            )
-            msg = completion.choices[0].message
-            return (msg.content or "").strip()
-
-        except BadRequestError as e:
-            # Model decommissioned / invalid model id -> try next
-            last_err = e
-            continue
-
-        except Exception as e:
-            # transient network etc -> try next
-            last_err = e
-            continue
-
-    raise RuntimeError(f"Groq failed for models={tried}. Last error: {last_err}")
 
