@@ -7,12 +7,15 @@ Priority:
 3) Local transformers fallback (always works)
 """
 
+import logging
 import os
 import time
 from typing import Any, Dict, List, Optional, Union
 
 import requests
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 from llm.prompts import SYSTEM_PROMPT
 from llm.reasoning import MultiDocReasoner
@@ -84,8 +87,8 @@ class LLMClient:
                     max_tokens=max_tokens,
                     system_prompt=system_prompt or SYSTEM_PROMPT,
                 )
-            except Exception:
-                pass  # fall through
+            except Exception as exc:
+                logger.warning("Groq API call failed, falling back to HF: %s", exc)
 
         # 2) HF (best-effort only; your curl shows this may be dead / 410)
         api_result = self._generate_via_hf_api(
@@ -134,8 +137,8 @@ class LLMClient:
                     system_prompt=SYSTEM_PROMPT,
                 )
                 return {"response": response_text, "query_type": query_type}
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Groq reasoning call failed, falling back: %s", exc)
 
         # fallback: use whatever generate() can do
         response_text = self.generate(prompt=prompt, system_prompt=SYSTEM_PROMPT)
@@ -227,7 +230,4 @@ class LLMClient:
         if isinstance(out, list) and out and isinstance(out[0], dict):
             return (out[0].get("generated_text") or "").strip()
         return str(out)
-
-
-
 

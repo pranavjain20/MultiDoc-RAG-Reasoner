@@ -181,7 +181,3 @@ def select_prompt_builder(query_type: str) -> Callable:
 
 
 
-
-
-
-

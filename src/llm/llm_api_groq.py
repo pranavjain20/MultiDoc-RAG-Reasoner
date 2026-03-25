@@ -13,10 +13,9 @@ from groq import Groq
 # Human-readable names exposed in the UI (if you add dropdown later)
 AVAILABLE_MODELS = {
     "LLaMA 3.1 8B (fast)": "llama-3.1-8b-instant",
-    # ✅ 70B 3.1 已下线；用 3.3
+    # 70B 3.1 is deprecated; use 3.3 instead
     "LLaMA 3.3 70B (better)": "llama-3.3-70b-versatile",
     "LLaMA 3.3 70B (specdec)": "llama-3.3-70b-specdec",
-    # Mixtral 8x7b-32768 也在 deprecations 里，尽量别当默认
 }
 
 DEFAULT_MODEL = AVAILABLE_MODELS["LLaMA 3.3 70B (better)"]

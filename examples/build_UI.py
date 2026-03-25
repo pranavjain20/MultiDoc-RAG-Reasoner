@@ -247,11 +247,8 @@ def format_evidence(chunks: List[Dict]) -> str:
 
 
 # =========================================================
-# UI (UNCHANGED)
+# UI
 # =========================================================
-# ⚠️ 下面 UI / CSS / footer / tabs
-# ⚠️ 与你原文件完全一致
-# ⚠️ 我没有删一行
 
 
 
@@ -657,7 +654,7 @@ def create_demo():
                     color: #9ca3af;
                     margin-bottom: 0.5rem;
                 ">
-                    <strong style="color: #667eea;">COMS 4995:</strong> Applied Machine Learning — Final Project
+                    <strong style="color: #667eea;">Built at Columbia University</strong> | COMS 4995 Applied Machine Learning
                 </p>
             </div>
             
@@ -669,16 +666,16 @@ def create_demo():
                 margin-top: 1rem;
             ">
                 <span style="color: #6b7280; font-size: 0.9rem;">
-                    <strong>Cheng Wu</strong> <span style="color: #9ca3af;">(cw3729)</span>
+                    <strong>Cheng Wu</strong>
                 </span>
                 <span style="color: #6b7280; font-size: 0.9rem;">
-                    <strong>Pranav Jain</strong> <span style="color: #9ca3af;">(pj2459)</span>
+                    <strong>Pranav Jain</strong>
                 </span>
                 <span style="color: #6b7280; font-size: 0.9rem;">
-                    <strong>Jaewon Cho</strong> <span style="color: #9ca3af;">(jc6618)</span>
+                    <strong>Jaewon Cho</strong>
                 </span>
                 <span style="color: #6b7280; font-size: 0.9rem;">
-                    <strong>Winston Li</strong> <span style="color: #9ca3af;">(wl3062)</span>
+                    <strong>Winston Li</strong>
                 </span>
             </div>
             
