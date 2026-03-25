@@ -1,5 +1,7 @@
 # Multi-Document RAG Reasoner
 
+**[Live Demo](https://pranavjain20-multidoc-rag-reasoner.hf.space)**
+
 A retrieval-augmented generation system that performs **document-aware reasoning** across multiple PDFs. Unlike flat RAG pipelines that treat all retrieved chunks as undifferentiated context, this system classifies queries by type, builds structured prompts with explicit document boundaries, and enforces source citations.
 
 > Built as a final project for **Columbia's COMS 4995 (Applied Machine Learning)** with Cheng Wu, Jaewon Cho, and Winston Li. This fork contains my post-class improvements focused on code quality, testability, and reproducibility.
