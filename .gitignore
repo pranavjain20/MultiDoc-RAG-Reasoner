@@ -143,3 +143,10 @@ cython_debug/
 *~
 .DS_Store
 
+# Project artifacts (generated at runtime)
+evaluation_files/*.pdf
+evaluation_outputs/
+index_store/
+ui_uploads/
+report/
+
