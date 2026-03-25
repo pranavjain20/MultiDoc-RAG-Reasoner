@@ -139,7 +139,7 @@ def build_index_from_pdfs(pdf_paths: List[str]) -> str:
         os.makedirs(INDEX_STORE_PATH, exist_ok=True)
         vectorstore.save_local(INDEX_STORE_PATH)
 
-        return f"Index created\n{len(all_docs)} pages → {len(chunks)} chunks from {doc_count} documents"
+        return f"Index created\n{len(all_docs)} pages \u2192 {len(chunks)} chunks from {doc_count} documents"
 
     except Exception as e:
         return f"Build failed: {str(e)}"
@@ -247,459 +247,482 @@ def format_evidence(chunks: List[Dict]) -> str:
 
 
 # =========================================================
-# UI
+# UI Design System
 # =========================================================
 
-
-
-# =========================================================
-# Design with CSS
-# =========================================================
 custom_css = """
-/* Import clean fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300..800&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* Global overrides - Center everything */
+:root {
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-light: #eef2ff;
+    --primary-subtle: #e0e7ff;
+    --primary-dark: #1e1b4b;
+    --surface: #ffffff;
+    --surface-raised: #f8fafc;
+    --page-bg: #fafaf8;
+    --text: #1e1b4b;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03);
+    --radius: 8px;
+    --radius-lg: 12px;
+    --font-display: 'Newsreader', Georgia, serif;
+    --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Foundation ── */
 .gradio-container {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    max-width: 95% !important;
-    width: 95% !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    padding-left: 3rem !important;
-    padding-right: 3rem !important;
-}
-
-/* Main content centering */
-.main {
-    max-width: 100% !important;
+    font-family: var(--font-body) !important;
+    background: var(--page-bg) !important;
+    max-width: 1100px !important;
     margin: 0 auto !important;
+    padding: 0 2rem !important;
 }
+.main { max-width: 100% !important; }
+footer { display: none !important; }
 
-/* Headers */
+/* ── Typography ── */
 h1, h2, h3 {
-    font-weight: 600 !important;
+    font-family: var(--font-display) !important;
+    color: var(--text) !important;
     letter-spacing: -0.02em !important;
+    font-weight: 500 !important;
 }
 
-h1 {
-    font-size: 2rem !important;
-    margin-bottom: 0.5rem !important;
+/* ── Tabs ── */
+.tab-nav {
+    border-bottom: 1px solid var(--border) !important;
+    background: transparent !important;
+    gap: 0 !important;
+    padding: 0 !important;
 }
-
-.subtitle {
-    color: #666 !important;
-    font-size: 0.95rem !important;
-    margin-bottom: 2rem !important;
-}
-
-/* Tabs */
 .tab-nav button {
+    font-family: var(--font-body) !important;
     font-weight: 500 !important;
-    font-size: 0.95rem !important;
-}
-
-/* Buttons */
-button.primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    border: none !important;
-    font-weight: 500 !important;
-    transition: transform 0.2s, box-shadow 0.2s !important;
-    padding: 0.75rem 2rem !important;
-    font-size: 1.05rem !important;
-    min-height: 50px !important;
-}
-
-button.primary:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
-}
-
-button.secondary {
-    background: #f8f9fa !important;
-    border: 1px solid #e9ecef !important;
-    color: #495057 !important;
-    font-weight: 500 !important;
-    padding: 0.6rem 1.2rem !important;
-}
-
-button.secondary:hover {
-    background: #e9ecef !important;
-}
-
-/* Textboxes */
-textarea, input {
-    font-family: 'Inter', sans-serif !important;
-    border-radius: 8px !important;
-    border: 1px solid #e0e0e0 !important;
-    font-size: 1rem !important;
-}
-
-textarea {
-    min-height: 60px !important;
-}
-
-textarea:focus, input:focus {
-    border-color: #667eea !important;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
-}
-
-/* Code/Evidence blocks */
-.monospace {
-    font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.9rem !important;
-    background: #f8f9fa !important;
-    border-radius: 6px !important;
+    color: var(--text-muted) !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    padding: 0.75rem 1.25rem !important;
+    margin: 0 !important;
+    background: transparent !important;
+    transition: all 0.2s var(--ease) !important;
+    border-radius: 0 !important;
+}
+.tab-nav button.selected {
+    color: var(--primary) !important;
+    border-bottom-color: var(--primary) !important;
+    background: transparent !important;
+}
+.tab-nav button:hover:not(.selected) {
+    color: var(--text-secondary) !important;
 }
 
-/* File upload */
-.file-upload {
-    border: 2px dashed #d0d0d0 !important;
-    border-radius: 8px !important;
-    transition: border-color 0.3s !important;
-    min-height: 220px !important;
-    padding: 1.5rem !important;
+/* ── Primary Button ── */
+button.primary {
+    background: var(--primary) !important;
+    border: none !important;
+    font-family: var(--font-body) !important;
+    font-weight: 600 !important;
+    font-size: 0.92rem !important;
+    padding: 0.7rem 1.75rem !important;
+    border-radius: var(--radius) !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: all 0.2s var(--ease) !important;
+    letter-spacing: 0.01em !important;
+    min-height: 44px !important;
+}
+button.primary:hover {
+    background: var(--primary-hover) !important;
+    box-shadow: var(--shadow-md), 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+    transform: translateY(-1px) !important;
+}
+button.primary:active {
+    transform: translateY(0) !important;
+    box-shadow: var(--shadow-xs) !important;
 }
 
-.file-upload:hover {
-    border-color: #667eea !important;
+/* ── Example Pill Buttons ── */
+.example-pill button {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-secondary) !important;
+    font-family: var(--font-body) !important;
+    font-weight: 500 !important;
+    font-size: 0.8rem !important;
+    padding: 0.4rem 0.9rem !important;
+    border-radius: 20px !important;
+    transition: all 0.2s var(--ease) !important;
+    min-height: unset !important;
+}
+.example-pill button:hover {
+    background: var(--primary-light) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
 }
 
-/* File upload container - target Gradio's internal classes */
-.file-preview {
-    min-height: 400px !important;
+/* ── Inputs ── */
+textarea, input[type="text"] {
+    font-family: var(--font-body) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    font-size: 0.92rem !important;
+    background: var(--surface) !important;
+    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease) !important;
+    color: var(--text) !important;
+}
+textarea:focus, input[type="text"]:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08) !important;
+    outline: none !important;
 }
 
-label:has(> .file-upload) {
-    min-height: 400px !important;
+/* ── Labels ── */
+label > span {
+    font-family: var(--font-body) !important;
+    font-weight: 500 !important;
+    font-size: 0.82rem !important;
+    color: var(--text-secondary) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
 }
 
-/* Force consistent file upload height */
-.upload-container, .file-container {
-    min-height: 400px !important;
-    max-height: 400px !important;
+/* ── Upload Zone ── */
+.upload-area {
+    border-radius: var(--radius-lg) !important;
+    background: var(--surface) !important;
+    transition: all 0.2s var(--ease) !important;
 }
 
-/* Gradio file component wrapper */
-div[data-testid="file"] {
-    min-height: 400px !important;
+/* ── Answer Card ── */
+.answer-card textarea {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+    line-height: 1.75 !important;
 }
 
-.wrap.svelte-1ipelgc {
-    min-height: 400px !important;
+/* ── Query Type Badge ── */
+.query-badge input {
+    font-family: var(--font-body) !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    color: var(--primary) !important;
+    background: var(--primary-light) !important;
+    border: 1px solid var(--primary-subtle) !important;
+    border-radius: 20px !important;
+    text-align: center !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
 }
 
-/* Status messages */
-.success {
-    color: #28a745 !important;
+/* ── Evidence Display ── */
+.evidence-box textarea {
+    font-family: var(--font-mono) !important;
+    font-size: 0.8rem !important;
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius) !important;
+    line-height: 1.65 !important;
+    color: var(--text-secondary) !important;
 }
 
-.error {
-    color: #dc3545 !important;
+/* ── Build Status ── */
+.build-status textarea {
+    font-family: var(--font-mono) !important;
+    font-size: 0.8rem !important;
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius) !important;
+    color: var(--text-secondary) !important;
 }
 
-/* Spacing */
-.gap-sm {
-    margin-bottom: 1rem !important;
+/* ── Accordion ── */
+.gradio-accordion {
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius) !important;
+    background: var(--surface) !important;
+}
+.gradio-accordion > .label-wrap {
+    font-family: var(--font-body) !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    color: var(--text-secondary) !important;
+    padding: 0.75rem 1rem !important;
 }
 
-.gap-md {
-    margin-bottom: 1.5rem !important;
+/* ── Markdown ── */
+.prose, .markdown-text, .md {
+    font-family: var(--font-body) !important;
+    color: var(--text-secondary) !important;
+    font-size: 0.88rem !important;
+    line-height: 1.6 !important;
 }
 
-.gap-lg {
-    margin-bottom: 2rem !important;
+/* ── Section Labels ── */
+.section-label h3 {
+    font-family: var(--font-display) !important;
+    font-size: 1.15rem !important;
+    font-weight: 500 !important;
+    color: var(--text) !important;
 }
 
-/* Info boxes */
-.info-box {
-    background: #f8f9fa;
-    border-left: 3px solid #667eea;
-    padding: 1rem;
-    border-radius: 4px;
-    margin: 1rem 0;
+/* ── Config Table ── */
+.gradio-accordion table {
+    font-family: var(--font-body) !important;
+    font-size: 0.82rem !important;
+    color: var(--text-secondary) !important;
+}
+.gradio-accordion table th {
+    font-weight: 600 !important;
+    color: var(--text) !important;
+    text-transform: uppercase !important;
+    font-size: 0.72rem !important;
+    letter-spacing: 0.06em !important;
 }
 
-.info-box code {
-    background: #e9ecef;
-    padding: 0.2rem 0.4rem;
-    border-radius: 3px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.9em;
+/* ── Load Animation ── */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
 }
+.app-header { animation: fadeIn 0.5s ease-out both; }
+.tabitem { animation: fadeIn 0.3s ease-out 0.1s both; }
 
-/* Row alignment fix */
-.row {
-    display: flex !important;
-    align-items: stretch !important;
-    gap: 2.5rem !important;
-}
+/* ── Scrollbar ── */
+textarea::-webkit-scrollbar { width: 5px; }
+textarea::-webkit-scrollbar-track { background: transparent; }
+textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+textarea::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-/* Column balance */
-.column {
-    flex: 1 !important;
-    min-width: 0 !important;
-}
-
-/* Tab content spacing */
-.tab-content {
-    padding: 1.5rem 0 !important;
-}
+/* ── Row Spacing ── */
+.row { gap: 1.5rem !important; }
 """
 
+
 # =========================================================
-# Footer & Query
+# UI Layout
 # =========================================================
+
 def create_demo():
-    with gr.Blocks(title="Multi-Doc RAG", theme=gr.themes.Soft()) as demo:
-        
+    with gr.Blocks(title="Multi-Doc RAG Assistant", theme=gr.themes.Soft()) as demo:
 
         gr.HTML(f"<style>{custom_css}</style>")
-        
+
+        # ── Header ──
         gr.HTML("""
-        <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div class="app-header" style="text-align: center; padding: 2.5rem 0 1.5rem;">
+            <div style="width: 36px; height: 3px; background: #4f46e5; margin: 0 auto 1.25rem; border-radius: 2px;"></div>
             <h1 style="
-                font-size: 2.5rem;
-                font-weight: 700;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                margin-bottom: 0.5rem;
+                font-family: 'Newsreader', Georgia, serif;
+                font-size: 2.4rem;
+                font-weight: 500;
+                color: #1e1b4b;
                 letter-spacing: -0.03em;
+                margin: 0 0 0.4rem;
+                line-height: 1.2;
             ">Multi-Document RAG Assistant</h1>
             <p style="
-                color: #6b7280;
-                font-size: 1rem;
+                font-family: 'DM Sans', sans-serif;
+                color: #64748b;
+                font-size: 0.95rem;
                 font-weight: 400;
                 margin: 0;
             ">AI-powered question answering across multiple PDF documents</p>
         </div>
         """)
-        
+
         with gr.Tabs():
+
+            # ── Setup Tab ──
             with gr.Tab("Setup"):
-                
+
                 with gr.Row():
                     with gr.Column(scale=1):
-                        gr.Markdown("### 1. Upload Documents")
+                        gr.Markdown("### Upload Documents", elem_classes=["section-label"])
                         file_upload = gr.File(
-                            label="Select PDF files",
+                            label="PDF Documents",
                             file_count="multiple",
                             file_types=[".pdf"],
                             type="filepath",
-                            elem_classes=["file-upload"],
-                            height=250
+                            elem_classes=["upload-area"],
+                            height=220,
                         )
-                        
                         upload_status = gr.Textbox(
                             label="Status",
                             value="No files uploaded",
                             interactive=False,
-                            lines=2
+                            lines=1,
                         )
-                    
+
                     with gr.Column(scale=1):
-                        gr.Markdown("### 2. Build Index")
-                        gr.Markdown("Process PDFs and create searchable index.")
-                        
+                        gr.Markdown("### Build Index", elem_classes=["section-label"])
+                        gr.Markdown(
+                            "Process uploaded PDFs into a searchable vector index "
+                            "for retrieval-augmented generation."
+                        )
                         build_btn = gr.Button(
                             "Build Index",
                             variant="primary",
-                            size="lg"
+                            size="lg",
                         )
-                        
                         build_output = gr.Textbox(
-                            label="Build Status",
+                            label="Build Log",
                             interactive=False,
-                            lines=8
+                            lines=6,
+                            elem_classes=["build-status"],
                         )
-                
-                # Configuration info
-                with gr.Accordion("Configuration Details", open=False):
+
+                with gr.Accordion("Advanced Configuration", open=False):
                     gr.Markdown("""
-                    **Index Settings**
-                    - Chunk Size: 800 characters
-                    - Overlap: 150 characters
-                    - Embeddings: all-MiniLM-L6-v2
-                    - Retrieval: Top-6 chunks
-                    
-                    **LLM Settings**
-                    - Model: google/flan-t5-large
-                    - Temperature: 0.3
-                    - Max Tokens: 512
+| Parameter | Value |
+|-----------|-------|
+| Chunk Size | 800 characters |
+| Overlap | 150 characters |
+| Embedding Model | all-MiniLM-L6-v2 |
+| Retrieval | Top-6 chunks (from 18 candidates) |
+| LLM | Groq / HuggingFace Inference |
                     """)
-                
+
                 # Event handlers
                 def update_upload_status(files):
                     if not files:
                         return "No files uploaded"
                     count = len([f for f in files if f is not None])
-                    return f"✓ {count} file(s) ready"
-                
+                    return f"{count} file(s) ready"
+
                 file_upload.change(
                     fn=update_upload_status,
                     inputs=[file_upload],
-                    outputs=[upload_status]
+                    outputs=[upload_status],
                 )
-                
+
                 def build_index_ui(files):
                     saved_paths = save_uploads(files)
                     return build_index_from_pdfs(saved_paths)
-                
+
                 build_btn.click(
                     fn=build_index_ui,
                     inputs=[file_upload],
-                    outputs=[build_output]
+                    outputs=[build_output],
                 )
-            
+
+            # ── Query Tab ──
             with gr.Tab("Query"):
-                
-                gr.Markdown("### Ask a Question")
-                
+
                 question_input = gr.Textbox(
-                    label="Your question",
+                    label="Your Question",
                     placeholder="What are the main findings across all documents?",
-                    lines=2
+                    lines=2,
                 )
-                
+
                 ask_btn = gr.Button(
                     "Get Answer",
                     variant="primary",
-                    size="lg"
+                    size="lg",
                 )
-                
-                # Example questions as buttons
-                gr.Markdown("**Quick Examples:**")
-                with gr.Row():
+
+                gr.Markdown("**Try an example:**")
+                with gr.Row(elem_classes=["example-pill"]):
                     example_btn1 = gr.Button(
-                        "Main findings across documents",
-                        size="sm",
-                        variant="secondary"
+                        "Main findings across documents", size="sm",
                     )
                     example_btn2 = gr.Button(
-                        "Compare methodologies",
-                        size="sm",
-                        variant="secondary"
+                        "Compare methodologies", size="sm",
                     )
                     example_btn3 = gr.Button(
-                        "Key assumptions and limitations",
-                        size="sm",
-                        variant="secondary"
+                        "Key assumptions & limitations", size="sm",
                     )
-                
-                # Results
-                answer_output = gr.Textbox(
-                    label="Answer",
-                    interactive=False,
-                    lines=10
-                )
-                
+
+                # Answer + query type
                 with gr.Row():
-                    query_type_output = gr.Textbox(
-                        label="Query Type",
+                    with gr.Column(scale=5):
+                        answer_output = gr.Textbox(
+                            label="Answer",
+                            interactive=False,
+                            lines=12,
+                            elem_classes=["answer-card"],
+                        )
+                    with gr.Column(scale=1, min_width=120):
+                        query_type_output = gr.Textbox(
+                            label="Query Type",
+                            interactive=False,
+                            lines=1,
+                            elem_classes=["query-badge"],
+                        )
+
+                # Evidence
+                with gr.Accordion("Supporting Evidence", open=False):
+                    evidence_output = gr.Textbox(
+                        label="Retrieved Chunks",
                         interactive=False,
-                        lines=1
+                        lines=15,
+                        elem_classes=["evidence-box"],
                     )
-                    
-                    with gr.Column():
-                        gr.Markdown("""
-                        **Query Types:**
-                        - **synthesis**: Combining info
-                        - **comparison**: Contrasting sources
-                        - **extraction**: Finding specifics
-                        """)
-                
-                evidence_output = gr.Textbox(
-                    label="Supporting Evidence",
-                    interactive=False,
-                    lines=12,
-                    elem_classes=["monospace"]
-                )
-                
+
                 # Event handlers
                 ask_btn.click(
                     fn=answer_question,
                     inputs=[question_input],
-                    outputs=[answer_output, query_type_output, evidence_output]
+                    outputs=[answer_output, query_type_output, evidence_output],
                 )
-                
-                # Example button handlers
+
                 example_btn1.click(
                     lambda: "What are the main sources of risk mentioned across all documents?",
-                    outputs=[question_input]
+                    outputs=[question_input],
                 )
-                
                 example_btn2.click(
                     lambda: "How do the documents differ in their treatment of the same concept or methodology?",
-                    outputs=[question_input]
+                    outputs=[question_input],
                 )
-                
                 example_btn3.click(
                     lambda: "What assumptions and limitations are highlighted in the documents?",
-                    outputs=[question_input]
+                    outputs=[question_input],
                 )
-        
 
+        # ── Footer ──
         gr.HTML("""
         <div style="
-            margin-top: 2rem;
-            padding: 1.5rem 0 1rem 0;
-            border-top: 1px solid #e5e7eb;
+            margin-top: 3rem;
+            padding: 1.25rem 0;
+            border-top: 1px solid #e2e8f0;
             text-align: center;
         ">
-            <div style="margin-bottom: 1rem;">
-                <p style="
-                    font-size: 0.9rem;
-                    color: #9ca3af;
-                    margin-bottom: 0.5rem;
-                ">
-                    <strong style="color: #667eea;">Built at Columbia University</strong> | COMS 4995 Applied Machine Learning
-                </p>
-            </div>
-            
+            <p style="
+                font-family: 'DM Sans', sans-serif;
+                font-size: 0.82rem;
+                color: #94a3b8;
+                margin: 0 0 0.5rem;
+            ">
+                Built at <strong style="color: #475569;">Columbia University</strong>
+                &middot; COMS 4995 Applied Machine Learning
+            </p>
             <div style="
                 display: flex;
                 justify-content: center;
-                gap: 2rem;
-                flex-wrap: wrap;
-                margin-top: 1rem;
+                gap: 0.5rem;
+                align-items: center;
             ">
-                <span style="color: #6b7280; font-size: 0.9rem;">
-                    <strong>Cheng Wu</strong>
-                </span>
-                <span style="color: #6b7280; font-size: 0.9rem;">
-                    <strong>Pranav Jain</strong>
-                </span>
-                <span style="color: #6b7280; font-size: 0.9rem;">
-                    <strong>Jaewon Cho</strong>
-                </span>
-                <span style="color: #6b7280; font-size: 0.9rem;">
-                    <strong>Winston Li</strong>
-                </span>
+                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #94a3b8;">Cheng Wu</span>
+                <span style="color: #cbd5e1;">&middot;</span>
+                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #94a3b8;">Pranav Jain</span>
+                <span style="color: #cbd5e1;">&middot;</span>
+                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #94a3b8;">Jaewon Cho</span>
+                <span style="color: #cbd5e1;">&middot;</span>
+                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #94a3b8;">Winston Li</span>
             </div>
-            
-            <p style="
-                margin-top: 1.5rem;
-                font-size: 0.85rem;
-                color: #9ca3af;
-            ">
-                <strong>Requirements:</strong> Set <code style="
-                    background: #f3f4f6;
-                    padding: 0.2rem 0.4rem;
-                    border-radius: 3px;
-                    font-family: 'JetBrains Mono', monospace;
-                ">HF_TOKEN</code> in <code style="
-                    background: #f3f4f6;
-                    padding: 0.2rem 0.4rem;
-                    border-radius: 3px;
-                    font-family: 'JetBrains Mono', monospace;
-                ">.env</code> file 
-                (<a href="https://huggingface.co/settings/tokens" target="_blank" style="color: #667eea; text-decoration: none;">Get token</a>)
-            </p>
         </div>
         """)
-    
+
     return demo
 
 

@@ -1,3 +1,15 @@
+---
+title: MultiDoc RAG Reasoner
+emoji: 📚
+colorFrom: indigo
+colorTo: purple
+sdk: gradio
+sdk_version: 4.44.1
+app_file: app.py
+pinned: false
+python_version: "3.12"
+---
+
 # Multi-Document RAG Reasoner
 
 A retrieval-augmented generation system that performs **document-aware reasoning** across multiple PDFs. Unlike flat RAG pipelines that treat all retrieved chunks as undifferentiated context, this system classifies queries by type, builds structured prompts with explicit document boundaries, and enforces source citations.
