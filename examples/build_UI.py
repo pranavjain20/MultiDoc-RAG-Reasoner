@@ -253,23 +253,22 @@ def format_evidence(chunks: List[Dict]) -> str:
 custom_css = """
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300..800&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-:root {
-    --primary: #4f46e5;
-    --primary-hover: #4338ca;
-    --primary-light: #eef2ff;
-    --primary-subtle: #e0e7ff;
-    --primary-dark: #1e1b4b;
-    --surface: #ffffff;
-    --surface-raised: #f8fafc;
-    --page-bg: #fafaf8;
-    --text: #1e1b4b;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --border: #e2e8f0;
-    --border-light: #f1f5f9;
-    --shadow-xs: 0 1px 2px rgba(0,0,0,0.03);
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03);
+:root, .dark {
+    --primary: #818cf8;
+    --primary-hover: #a5b4fc;
+    --primary-dim: #6366f1;
+    --primary-glow: rgba(129, 140, 248, 0.15);
+    --primary-ghost: rgba(129, 140, 248, 0.08);
+    --surface: #161b22;
+    --surface-raised: #1c2129;
+    --page-bg: #0d1117;
+    --text: #e6edf3;
+    --text-secondary: #b1bac4;
+    --text-muted: #7d8590;
+    --border: #30363d;
+    --border-light: #21262d;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
     --radius: 8px;
     --radius-lg: 12px;
     --font-display: 'Newsreader', Georgia, serif;
@@ -278,10 +277,13 @@ custom_css = """
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── Foundation ── */
+/* ── Force Dark Foundation ── */
+body, .gradio-container, .main, .contain {
+    background: var(--page-bg) !important;
+    color: var(--text) !important;
+}
 .gradio-container {
     font-family: var(--font-body) !important;
-    background: var(--page-bg) !important;
     max-width: 1100px !important;
     margin: 0 auto !important;
     padding: 0 2rem !important;
@@ -289,10 +291,22 @@ custom_css = """
 .main { max-width: 100% !important; }
 footer { display: none !important; }
 
+/* Override ALL Gradio dark backgrounds */
+.block, .wrap, .panel, .form, .container {
+    background: transparent !important;
+}
+.block.padded {
+    background: var(--surface) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius) !important;
+}
+
 /* ── Typography ── */
+h1, h2, h3, h4, p, span, label {
+    color: var(--text) !important;
+}
 h1, h2, h3 {
     font-family: var(--font-display) !important;
-    color: var(--text) !important;
     letter-spacing: -0.02em !important;
     font-weight: 500 !important;
 }
@@ -307,11 +321,11 @@ h1, h2, h3 {
 .tab-nav button {
     font-family: var(--font-body) !important;
     font-weight: 500 !important;
-    font-size: 0.9rem !important;
+    font-size: 0.95rem !important;
     color: var(--text-muted) !important;
     border: none !important;
     border-bottom: 2px solid transparent !important;
-    padding: 0.75rem 1.25rem !important;
+    padding: 0.75rem 1.5rem !important;
     margin: 0 !important;
     background: transparent !important;
     transition: all 0.2s var(--ease) !important;
@@ -328,26 +342,26 @@ h1, h2, h3 {
 
 /* ── Primary Button ── */
 button.primary {
-    background: var(--primary) !important;
+    background: var(--primary-dim) !important;
+    color: #fff !important;
     border: none !important;
     font-family: var(--font-body) !important;
     font-weight: 600 !important;
-    font-size: 0.92rem !important;
-    padding: 0.7rem 1.75rem !important;
+    font-size: 0.95rem !important;
+    padding: 0.75rem 2rem !important;
     border-radius: var(--radius) !important;
     box-shadow: var(--shadow-sm) !important;
     transition: all 0.2s var(--ease) !important;
     letter-spacing: 0.01em !important;
-    min-height: 44px !important;
+    min-height: 46px !important;
 }
 button.primary:hover {
-    background: var(--primary-hover) !important;
-    box-shadow: var(--shadow-md), 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+    background: var(--primary) !important;
+    box-shadow: var(--shadow-md), 0 0 0 3px var(--primary-glow) !important;
     transform: translateY(-1px) !important;
 }
 button.primary:active {
     transform: translateY(0) !important;
-    box-shadow: var(--shadow-xs) !important;
 }
 
 /* ── Example Pill Buttons ── */
@@ -357,58 +371,59 @@ button.primary:active {
     color: var(--text-secondary) !important;
     font-family: var(--font-body) !important;
     font-weight: 500 !important;
-    font-size: 0.8rem !important;
-    padding: 0.4rem 0.9rem !important;
+    font-size: 0.82rem !important;
+    padding: 0.45rem 1rem !important;
     border-radius: 20px !important;
     transition: all 0.2s var(--ease) !important;
     min-height: unset !important;
 }
 .example-pill button:hover {
-    background: var(--primary-light) !important;
+    background: var(--primary-ghost) !important;
     border-color: var(--primary) !important;
     color: var(--primary) !important;
 }
 
 /* ── Inputs ── */
-textarea, input[type="text"] {
+textarea, input[type="text"], input[type="search"] {
     font-family: var(--font-body) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radius) !important;
     font-size: 0.92rem !important;
     background: var(--surface) !important;
-    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease) !important;
     color: var(--text) !important;
+    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease) !important;
 }
-textarea:focus, input[type="text"]:focus {
+textarea:focus, input:focus {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08) !important;
+    box-shadow: 0 0 0 3px var(--primary-glow) !important;
     outline: none !important;
 }
 
 /* ── Labels ── */
-label > span {
+label > span, .label-wrap > span {
     font-family: var(--font-body) !important;
-    font-weight: 500 !important;
-    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    font-size: 0.78rem !important;
     color: var(--text-secondary) !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
+    letter-spacing: 0.06em !important;
 }
 
 /* ── Upload Zone ── */
 .upload-area {
     border-radius: var(--radius-lg) !important;
     background: var(--surface) !important;
-    transition: all 0.2s var(--ease) !important;
+    border-color: var(--border) !important;
 }
 
 /* ── Answer Card ── */
 .answer-card textarea {
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
-    border-radius: var(--radius-lg) !important;
-    box-shadow: var(--shadow-sm) !important;
+    border-left: 3px solid var(--primary-dim) !important;
+    border-radius: var(--radius) !important;
     line-height: 1.75 !important;
+    color: var(--text) !important;
 }
 
 /* ── Query Type Badge ── */
@@ -417,11 +432,11 @@ label > span {
     font-size: 0.75rem !important;
     font-weight: 600 !important;
     color: var(--primary) !important;
-    background: var(--primary-light) !important;
-    border: 1px solid var(--primary-subtle) !important;
+    background: var(--primary-ghost) !important;
+    border: 1px solid var(--primary-glow) !important;
     border-radius: 20px !important;
     text-align: center !important;
-    letter-spacing: 0.05em !important;
+    letter-spacing: 0.06em !important;
     text-transform: uppercase !important;
 }
 
@@ -448,30 +463,33 @@ label > span {
 
 /* ── Accordion ── */
 .gradio-accordion {
-    border: 1px solid var(--border-light) !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radius) !important;
     background: var(--surface) !important;
 }
 .gradio-accordion > .label-wrap {
     font-family: var(--font-body) !important;
-    font-size: 0.85rem !important;
+    font-size: 0.88rem !important;
     font-weight: 500 !important;
     color: var(--text-secondary) !important;
     padding: 0.75rem 1rem !important;
 }
 
 /* ── Markdown ── */
-.prose, .markdown-text, .md {
+.prose, .markdown-text, .md, .markdown p, .markdown li {
     font-family: var(--font-body) !important;
     color: var(--text-secondary) !important;
-    font-size: 0.88rem !important;
+    font-size: 0.9rem !important;
     line-height: 1.6 !important;
+}
+.markdown strong, .markdown b {
+    color: var(--text) !important;
 }
 
 /* ── Section Labels ── */
 .section-label h3 {
     font-family: var(--font-display) !important;
-    font-size: 1.15rem !important;
+    font-size: 1.2rem !important;
     font-weight: 500 !important;
     color: var(--text) !important;
 }
@@ -481,6 +499,7 @@ label > span {
     font-family: var(--font-body) !important;
     font-size: 0.82rem !important;
     color: var(--text-secondary) !important;
+    border-color: var(--border-light) !important;
 }
 .gradio-accordion table th {
     font-weight: 600 !important;
@@ -488,6 +507,10 @@ label > span {
     text-transform: uppercase !important;
     font-size: 0.72rem !important;
     letter-spacing: 0.06em !important;
+    border-color: var(--border) !important;
+}
+.gradio-accordion table td {
+    border-color: var(--border-light) !important;
 }
 
 /* ── Load Animation ── */
@@ -513,27 +536,38 @@ textarea::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 # UI Layout
 # =========================================================
 
+FORCE_DARK_JS = """
+() => {
+    document.body.classList.add('dark');
+    document.documentElement.style.setProperty('color-scheme', 'dark');
+}
+"""
+
 def create_demo():
-    with gr.Blocks(title="Multi-Doc RAG Assistant", theme=gr.themes.Soft()) as demo:
+    theme = gr.themes.Base(
+        primary_hue=gr.themes.colors.indigo,
+        neutral_hue=gr.themes.colors.slate,
+    )
+    with gr.Blocks(title="Multi-Doc RAG Assistant", theme=theme, js=FORCE_DARK_JS) as demo:
 
         gr.HTML(f"<style>{custom_css}</style>")
 
         # ── Header ──
         gr.HTML("""
         <div class="app-header" style="text-align: center; padding: 2.5rem 0 1.5rem;">
-            <div style="width: 36px; height: 3px; background: #4f46e5; margin: 0 auto 1.25rem; border-radius: 2px;"></div>
+            <div style="width: 36px; height: 3px; background: #818cf8; margin: 0 auto 1.25rem; border-radius: 2px;"></div>
             <h1 style="
                 font-family: 'Newsreader', Georgia, serif;
                 font-size: 2.4rem;
                 font-weight: 500;
-                color: #1e1b4b;
+                color: #e6edf3;
                 letter-spacing: -0.03em;
                 margin: 0 0 0.4rem;
                 line-height: 1.2;
             ">Multi-Document RAG Assistant</h1>
             <p style="
                 font-family: 'DM Sans', sans-serif;
-                color: #64748b;
+                color: #7d8590;
                 font-size: 0.95rem;
                 font-weight: 400;
                 margin: 0;
@@ -694,16 +728,16 @@ def create_demo():
         <div style="
             margin-top: 3rem;
             padding: 1.25rem 0;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid #30363d;
             text-align: center;
         ">
             <p style="
                 font-family: 'DM Sans', sans-serif;
                 font-size: 0.82rem;
-                color: #94a3b8;
+                color: #7d8590;
                 margin: 0 0 0.5rem;
             ">
-                Built at <strong style="color: #475569;">Columbia University</strong>
+                Built at <strong style="color: #b1bac4;">Columbia University</strong>
                 &middot; COMS 4995 Applied Machine Learning
             </p>
             <div style="
@@ -712,13 +746,13 @@ def create_demo():
                 gap: 0.5rem;
                 align-items: center;
             ">
-                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #94a3b8;">Cheng Wu</span>
-                <span style="color: #cbd5e1;">&middot;</span>
-                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #94a3b8;">Pranav Jain</span>
-                <span style="color: #cbd5e1;">&middot;</span>
-                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #94a3b8;">Jaewon Cho</span>
-                <span style="color: #cbd5e1;">&middot;</span>
-                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #94a3b8;">Winston Li</span>
+                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #7d8590;">Cheng Wu</span>
+                <span style="color: #30363d;">&middot;</span>
+                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #7d8590;">Pranav Jain</span>
+                <span style="color: #30363d;">&middot;</span>
+                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #7d8590;">Jaewon Cho</span>
+                <span style="color: #30363d;">&middot;</span>
+                <span style="font-family: 'DM Sans'; font-size: 0.78rem; color: #7d8590;">Winston Li</span>
             </div>
         </div>
         """)
