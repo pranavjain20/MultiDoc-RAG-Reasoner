@@ -1,7 +1,7 @@
 # Core libraries
 python-dotenv>=1.0.0
 requests>=2.31.0
-huggingface_hub>=0.20.0,<0.24.0
+huggingface_hub>=0.20.0
 groq>=0.4.0
 
 # LangChain components
@@ -26,7 +26,7 @@ faiss-cpu>=1.7.0
 numpy>=1.24.0
 
 # UI / Demo Layer
-gradio>=4.0.0
+gradio>=5.0.0
 
 # Local LLM fallback
 transformers>=4.35.0
