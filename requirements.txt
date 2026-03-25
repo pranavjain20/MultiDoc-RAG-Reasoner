@@ -1,7 +1,7 @@
 # Core libraries
 python-dotenv>=1.0.0
 requests>=2.31.0
-huggingface_hub>=0.20.0
+huggingface_hub>=0.20.0,<0.24.0
 groq>=0.4.0
 
 # LangChain components
