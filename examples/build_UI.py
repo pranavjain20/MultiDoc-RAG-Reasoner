@@ -474,6 +474,14 @@ label > span, .label-wrap > span {
     color: var(--text-secondary) !important;
     padding: 0.75rem 1rem !important;
 }
+/* Fix accordion arrow — flip so it points right when closed, down when open */
+.gradio-accordion > .label-wrap .icon {
+    transform: rotate(90deg) !important;
+    transition: transform 0.2s var(--ease) !important;
+}
+.gradio-accordion > .label-wrap.open .icon {
+    transform: rotate(180deg) !important;
+}
 
 /* ── Markdown ── */
 .prose, .markdown-text, .md, .markdown p, .markdown li {
