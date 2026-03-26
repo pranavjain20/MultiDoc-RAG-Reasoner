@@ -529,6 +529,23 @@ textarea::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ── Row Spacing ── */
 .row { gap: 1.5rem !important; }
+
+/* ── Action Buttons (not full-width per Stitch design) ── */
+.action-btn {
+    max-width: 200px !important;
+}
+.action-btn button {
+    width: 100% !important;
+}
+
+/* ── Config Fields ── */
+.config-field input, .config-field textarea {
+    font-family: var(--font-mono) !important;
+    font-size: 0.82rem !important;
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--border-light) !important;
+    color: var(--text-secondary) !important;
+}
 """
 
 
@@ -557,9 +574,9 @@ def create_demo():
         <div class="app-header" style="text-align: center; padding: 2.5rem 0 1.5rem;">
             <div style="width: 36px; height: 3px; background: #818cf8; margin: 0 auto 1.25rem; border-radius: 2px;"></div>
             <h1 style="
-                font-family: 'Newsreader', Georgia, serif;
-                font-size: 2.4rem;
-                font-weight: 500;
+                font-family: 'DM Sans', sans-serif;
+                font-size: 2.2rem;
+                font-weight: 600;
                 color: #e6edf3;
                 letter-spacing: -0.03em;
                 margin: 0 0 0.4rem;
@@ -607,7 +624,7 @@ def create_demo():
                         build_btn = gr.Button(
                             "Build Index",
                             variant="primary",
-                            size="lg",
+                            elem_classes=["action-btn"],
                         )
                         build_output = gr.Textbox(
                             label="Build Log",
@@ -617,15 +634,38 @@ def create_demo():
                         )
 
                 with gr.Accordion("Advanced Configuration", open=False):
-                    gr.Markdown("""
-| Parameter | Value |
-|-----------|-------|
-| Chunk Size | 800 characters |
-| Overlap | 150 characters |
-| Embedding Model | all-MiniLM-L6-v2 |
-| Retrieval | Top-6 chunks (from 18 candidates) |
-| LLM | Groq / HuggingFace Inference |
-                    """)
+                    with gr.Row():
+                        gr.Textbox(
+                            label="Chunk Size",
+                            value=f"{CHUNK_SIZE} chars",
+                            interactive=False,
+                            elem_classes=["config-field"],
+                        )
+                        gr.Textbox(
+                            label="Overlap",
+                            value=f"{CHUNK_OVERLAP} chars",
+                            interactive=False,
+                            elem_classes=["config-field"],
+                        )
+                        gr.Textbox(
+                            label="Retrieval",
+                            value=f"Top-{RETRIEVAL_K} (fetch {RETRIEVAL_FETCH_K})",
+                            interactive=False,
+                            elem_classes=["config-field"],
+                        )
+                    with gr.Row():
+                        gr.Textbox(
+                            label="Embedding Model",
+                            value=EMBEDDING_MODEL.split("/")[-1],
+                            interactive=False,
+                            elem_classes=["config-field"],
+                        )
+                        gr.Textbox(
+                            label="LLM Backend",
+                            value="Groq \u2192 HuggingFace \u2192 Local FLAN-T5",
+                            interactive=False,
+                            elem_classes=["config-field"],
+                        )
 
                 # Event handlers
                 def update_upload_status(files):
@@ -662,7 +702,7 @@ def create_demo():
                 ask_btn = gr.Button(
                     "Get Answer",
                     variant="primary",
-                    size="lg",
+                    elem_classes=["action-btn"],
                 )
 
                 gr.Markdown("**Try an example:**")
