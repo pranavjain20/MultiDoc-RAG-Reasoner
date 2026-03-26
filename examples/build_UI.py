@@ -16,6 +16,7 @@ from langchain_community.vectorstores import FAISS
 
 from llm.reasoning import MultiDocReasoner
 from llm.llm_client import LLMClient
+from llm.llm_api_groq import DEFAULT_MODEL as GROQ_MODEL
 
 load_dotenv()
 
@@ -670,7 +671,7 @@ def create_demo():
                         )
                         gr.Textbox(
                             label="LLM Backend",
-                            value="Groq \u2192 HuggingFace \u2192 Local FLAN-T5",
+                            value=f"Groq ({GROQ_MODEL}) \u2192 HF (flan-t5-large) \u2192 Local (flan-t5-base)",
                             interactive=False,
                             elem_classes=["config-field"],
                         )
