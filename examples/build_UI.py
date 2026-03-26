@@ -108,7 +108,7 @@ def save_uploads(files) -> List[str]:
     return saved_paths
 
 
-def build_index_from_pdfs(pdf_paths: List[str]) -> str:
+def build_index_from_pdfs(pdf_paths: List[str], chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP) -> str:
     try:
         if not pdf_paths:
             return "No files uploaded"
@@ -128,8 +128,8 @@ def build_index_from_pdfs(pdf_paths: List[str]) -> str:
             return "No pages loaded from PDFs"
 
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=CHUNK_SIZE,
-            chunk_overlap=CHUNK_OVERLAP,
+            chunk_size=int(chunk_size),
+            chunk_overlap=int(chunk_overlap),
             length_function=len,
         )
         chunks = text_splitter.split_documents(all_docs)
@@ -171,7 +171,7 @@ def load_retriever():
         return None
 
 
-def retrieve_chunks(question: str, retriever) -> List[Dict]:
+def retrieve_chunks(question: str, retriever, retrieval_k: int = RETRIEVAL_K) -> List[Dict]:
     if not retriever:
         return []
 
@@ -186,14 +186,14 @@ def retrieve_chunks(question: str, retriever) -> List[Dict]:
             }
         )
 
-    return filter_chunks(chunks, keep=RETRIEVAL_K)
+    return filter_chunks(chunks, keep=int(retrieval_k))
 
 
 # =========================================================
 # QA Pipeline
 # =========================================================
 
-def answer_question(question: str) -> Tuple[str, str, str]:
+def answer_question(question: str, retrieval_k: int = RETRIEVAL_K) -> Tuple[str, str, str]:
     if not os.path.exists(INDEX_STORE_PATH):
         return ("Build an index first (Setup tab)", "", "")
 
@@ -204,7 +204,7 @@ def answer_question(question: str) -> Tuple[str, str, str]:
     if not retriever:
         return ("Failed to load index", "", "")
 
-    chunks = retrieve_chunks(question, retriever)
+    chunks = retrieve_chunks(question, retriever, retrieval_k=int(retrieval_k))
     if not chunks:
         return ("No relevant information found", "", "")
 
@@ -630,11 +630,13 @@ def create_demo():
                             "Process uploaded PDFs into a searchable vector index "
                             "for retrieval-augmented generation."
                         )
-                        build_btn = gr.Button(
-                            "Build Index",
-                            variant="primary",
-                            elem_classes=["action-btn"],
-                        )
+                        with gr.Row():
+                            build_btn = gr.Button(
+                                "Build Index",
+                                variant="primary",
+                                scale=0,
+                                min_width=160,
+                            )
                         build_output = gr.Textbox(
                             label="Build Log",
                             interactive=False,
@@ -644,22 +646,22 @@ def create_demo():
 
                 with gr.Accordion("Advanced Configuration", open=False):
                     with gr.Row():
-                        gr.Textbox(
+                        chunk_size_input = gr.Number(
                             label="Chunk Size",
-                            value=f"{CHUNK_SIZE} chars",
-                            interactive=False,
+                            value=CHUNK_SIZE,
+                            precision=0,
                             elem_classes=["config-field"],
                         )
-                        gr.Textbox(
+                        overlap_input = gr.Number(
                             label="Overlap",
-                            value=f"{CHUNK_OVERLAP} chars",
-                            interactive=False,
+                            value=CHUNK_OVERLAP,
+                            precision=0,
                             elem_classes=["config-field"],
                         )
-                        gr.Textbox(
-                            label="Retrieval",
-                            value=f"Top-{RETRIEVAL_K} (fetch {RETRIEVAL_FETCH_K})",
-                            interactive=False,
+                        retrieval_k_input = gr.Number(
+                            label="Top-K Retrieval",
+                            value=RETRIEVAL_K,
+                            precision=0,
                             elem_classes=["config-field"],
                         )
                     with gr.Row():
@@ -689,13 +691,13 @@ def create_demo():
                     outputs=[upload_status],
                 )
 
-                def build_index_ui(files):
+                def build_index_ui(files, chunk_size, overlap):
                     saved_paths = save_uploads(files)
-                    return build_index_from_pdfs(saved_paths)
+                    return build_index_from_pdfs(saved_paths, chunk_size=chunk_size, chunk_overlap=overlap)
 
                 build_btn.click(
                     fn=build_index_ui,
-                    inputs=[file_upload],
+                    inputs=[file_upload, chunk_size_input, overlap_input],
                     outputs=[build_output],
                 )
 
@@ -708,11 +710,13 @@ def create_demo():
                     lines=2,
                 )
 
-                ask_btn = gr.Button(
-                    "Get Answer",
-                    variant="primary",
-                    elem_classes=["action-btn"],
-                )
+                with gr.Row():
+                    ask_btn = gr.Button(
+                        "Get Answer",
+                        variant="primary",
+                        scale=0,
+                        min_width=160,
+                    )
 
                 gr.Markdown("**Try an example:**")
                 with gr.Row(elem_classes=["example-pill"]):
@@ -753,9 +757,12 @@ def create_demo():
                     )
 
                 # Event handlers
+                def answer_with_config(question, retrieval_k):
+                    return answer_question(question, retrieval_k=retrieval_k)
+
                 ask_btn.click(
-                    fn=answer_question,
-                    inputs=[question_input],
+                    fn=answer_with_config,
+                    inputs=[question_input, retrieval_k_input],
                     outputs=[answer_output, query_type_output, evidence_output],
                 )
 
