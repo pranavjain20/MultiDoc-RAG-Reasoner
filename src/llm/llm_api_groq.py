@@ -11,14 +11,14 @@ from groq import Groq
 
 
 # Human-readable names exposed in the UI (if you add dropdown later)
+# Groq retired its Llama chat models; these are the text models it serves now.
 AVAILABLE_MODELS = {
-    "LLaMA 3.1 8B (fast)": "llama-3.1-8b-instant",
-    # 70B 3.1 is deprecated; use 3.3 instead
-    "LLaMA 3.3 70B (better)": "llama-3.3-70b-versatile",
-    "LLaMA 3.3 70B (specdec)": "llama-3.3-70b-specdec",
+    "GPT-OSS 20B (fast)": "openai/gpt-oss-20b",
+    "GPT-OSS 120B (better)": "openai/gpt-oss-120b",
+    "Qwen 3.8 27B": "qwen/qwen3.8-27b",
 }
 
-DEFAULT_MODEL = AVAILABLE_MODELS["LLaMA 3.3 70B (better)"]
+DEFAULT_MODEL = AVAILABLE_MODELS["GPT-OSS 120B (better)"]
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a careful teaching assistant for a data science / NLP course project.
